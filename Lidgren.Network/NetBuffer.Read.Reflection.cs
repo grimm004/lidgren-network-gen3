@@ -19,85 +19,84 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 using System;
 using System.Reflection;
 
-namespace Lidgren.Network
-{
-	public partial class NetBuffer
-	{
-		/// <summary>
-		/// Reads all public and private declared instance fields of the object in alphabetical order using reflection
-		/// </summary>
-		public void ReadAllFields(object target)
-		{
-			ReadAllFields(target, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-		}
+ namespace Lidgren.Network; 
 
-		/// <summary>
-		/// Reads all fields with the specified binding of the object in alphabetical order using reflection
-		/// </summary>
-		public void ReadAllFields(object target, BindingFlags flags)
-		{
-			if (target == null)
-				throw new ArgumentNullException("target");
+ public partial class NetBuffer
+ {
+	 /// <summary>
+	 /// Reads all public and private declared instance fields of the object in alphabetical order using reflection
+	 /// </summary>
+	 public void ReadAllFields(object target)
+	 {
+		 ReadAllFields(target, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+	 }
 
-			Type tp = target.GetType();
+	 /// <summary>
+	 /// Reads all fields with the specified binding of the object in alphabetical order using reflection
+	 /// </summary>
+	 public void ReadAllFields(object target, BindingFlags flags)
+	 {
+		 if (target == null)
+			 throw new ArgumentNullException("target");
 
-			FieldInfo[] fields = tp.GetFields(flags);
-			NetUtility.SortMembersList(fields);
+		 var tp = target.GetType();
 
-			foreach (FieldInfo fi in fields)
-			{
-				object value;
+		 var fields = tp.GetFields(flags);
+		 NetUtility.SortMembersList(fields);
 
-				// find read method
-				MethodInfo readMethod;
-				if (s_readMethods.TryGetValue(fi.FieldType, out readMethod))
-				{
-					// read value
-					value = readMethod.Invoke(this, null);
+		 foreach (var fi in fields)
+		 {
+			 object value;
 
-					// set the value
-					fi.SetValue(target, value);
-				}
-			}
-		}
+			 // find read method
+			 MethodInfo readMethod;
+			 if (s_readMethods.TryGetValue(fi.FieldType, out readMethod))
+			 {
+				 // read value
+				 value = readMethod.Invoke(this, null);
 
-		/// <summary>
-		/// Reads all public and private declared instance fields of the object in alphabetical order using reflection
-		/// </summary>
-		public void ReadAllProperties(object target)
-		{
-			ReadAllProperties(target, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-		}
+				 // set the value
+				 fi.SetValue(target, value);
+			 }
+		 }
+	 }
 
-		/// <summary>
-		/// Reads all fields with the specified binding of the object in alphabetical order using reflection
-		/// </summary>
-		public void ReadAllProperties(object target, BindingFlags flags)
-		{
-			if (target == null)
-				throw new ArgumentNullException("target");
+	 /// <summary>
+	 /// Reads all public and private declared instance fields of the object in alphabetical order using reflection
+	 /// </summary>
+	 public void ReadAllProperties(object target)
+	 {
+		 ReadAllProperties(target, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+	 }
 
-			Type tp = target.GetType();
+	 /// <summary>
+	 /// Reads all fields with the specified binding of the object in alphabetical order using reflection
+	 /// </summary>
+	 public void ReadAllProperties(object target, BindingFlags flags)
+	 {
+		 if (target == null)
+			 throw new ArgumentNullException("target");
 
-			PropertyInfo[] fields = tp.GetProperties(flags);
-			NetUtility.SortMembersList(fields);
-			foreach (PropertyInfo fi in fields)
-			{
-				object value;
+		 var tp = target.GetType();
 
-				// find read method
-				MethodInfo readMethod;
-				if (s_readMethods.TryGetValue(fi.PropertyType, out readMethod))
-				{
-					// read value
-					value = readMethod.Invoke(this, null);
+		 var fields = tp.GetProperties(flags);
+		 NetUtility.SortMembersList(fields);
+		 foreach (var fi in fields)
+		 {
+			 object value;
 
-					// set the value
-					var setMethod = fi.GetSetMethod();
-					if (setMethod != null)
-						setMethod.Invoke(target, new object[] { value });
-				}
-			}
-		}
-	}
-}
+			 // find read method
+			 MethodInfo readMethod;
+			 if (s_readMethods.TryGetValue(fi.PropertyType, out readMethod))
+			 {
+				 // read value
+				 value = readMethod.Invoke(this, null);
+
+				 // set the value
+				 var setMethod = fi.GetSetMethod();
+				 if (setMethod != null)
+					 setMethod.Invoke(target, new object[] { value });
+			 }
+		 }
+	 }
+ }
