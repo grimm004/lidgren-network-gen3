@@ -2,8 +2,12 @@
 using System.IO;
 using System.Xml;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 #if !__NOIPENDPOINT__
 using NetEndPoint = System.Net.IPEndPoint;
@@ -90,15 +94,15 @@ namespace Lidgren.Network
 	        m_status = UPnPStatus.NotAvailable;
 	    }
 
-		internal void ExtractServiceUrl(string resp)
+		internal async Task ExtractServiceUrl(string resp)
 		{
 #if !DEBUG
 			try
 			{
 #endif
 			var desc = new XmlDocument();
-			using (var response = WebRequest.Create(resp).GetResponse())
-				desc.Load(response.GetResponseStream());
+			using (var response = new HttpClient(new HttpClientHandler()))
+				desc.Load(await response.GetStreamAsync(resp));
 
 			var nsMgr = new XmlNamespaceManager(desc.NameTable);
 			nsMgr.AddNamespace("tns", "urn:schemas-upnp-org:device-1-0");
@@ -265,19 +269,19 @@ namespace Lidgren.Network
 			          soap +
 			          "</s:Body>" +
 			          "</s:Envelope>";
-			var r = HttpWebRequest.Create(url);
-			r.Method = "POST";
-			var b = System.Text.Encoding.UTF8.GetBytes(req);
-			r.Headers.Add("SOAPACTION", "\"urn:schemas-upnp-org:service:" + m_serviceName + ":1#" + function + "\""); 
-			r.ContentType = "text/xml; charset=\"utf-8\"";
-			r.ContentLength = b.Length;
-			r.GetRequestStream().Write(b, 0, b.Length);
-			using (var wres = r.GetResponse()) {
-				var resp = new XmlDocument();
-				var ress = wres.GetResponseStream();
-				resp.Load(ress);
-				return resp;
-			}
+
+			using var httpClient = new HttpClient();
+			
+			httpClient.DefaultRequestHeaders.Add("SOAPACTION", $"\"urn:schemas-upnp-org:service:{m_serviceName}:1#{function}\"");
+
+			var request = new HttpRequestMessage(HttpMethod.Post, url);
+			request.Content = new StringContent(req, Encoding.UTF8, "text/xml");
+			var response = httpClient.SendAsync(request).Result;
+
+			var resp = new XmlDocument();
+			var ress = response.Content.ReadAsStream();
+			resp.Load(ress);
+			return resp;
 		}
 	}
 }

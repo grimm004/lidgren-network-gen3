@@ -90,7 +90,7 @@ public abstract class NetRandom : Random
 	/// <summary>
 	/// Returns random value is greater or equal than 0.0f and less than 1.0f
 	/// </summary>
-	public float NextSingle()
+	public override float NextSingle()
 	{
 		var retval = (float)(c_realUnitInt * NextInt32());
 		if (retval == 1.0f)
