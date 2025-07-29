@@ -6,150 +6,149 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 
-namespace Lidgren.Network
+namespace Lidgren.Network;
+
+public static partial class NetUtility
 {
-	public static partial class NetUtility
-	{
-		private static readonly long s_timeInitialized = Stopwatch.GetTimestamp();
-		private static readonly double s_dInvFreq = 1.0 / (double)Stopwatch.Frequency;
+	private static readonly long s_timeInitialized = Stopwatch.GetTimestamp();
+	private static readonly double s_dInvFreq = 1.0 / (double)Stopwatch.Frequency;
 		
-		[CLSCompliant(false)]
-		public static ulong GetPlatformSeed(int seedInc)
+	[CLSCompliant(false)]
+	public static ulong GetPlatformSeed(int seedInc)
+	{
+		var seed = (ulong)System.Diagnostics.Stopwatch.GetTimestamp();
+		return seed ^ ((ulong)Environment.WorkingSet + (ulong)seedInc);
+	}
+
+	public static double Now { get { return (double)(Stopwatch.GetTimestamp() - s_timeInitialized) * s_dInvFreq; } }
+
+	private static NetworkInterface GetNetworkInterface()
+	{
+		var computerProperties = IPGlobalProperties.GetIPGlobalProperties();
+		if (computerProperties == null)
+			return null;
+
+		var nics = NetworkInterface.GetAllNetworkInterfaces();
+		if (nics == null || nics.Length < 1)
+			return null;
+
+		NetworkInterface best = null;
+		foreach (var adapter in nics)
 		{
-			var seed = (ulong)System.Diagnostics.Stopwatch.GetTimestamp();
-			return seed ^ ((ulong)Environment.WorkingSet + (ulong)seedInc);
-		}
+			if (adapter.NetworkInterfaceType == NetworkInterfaceType.Loopback || adapter.NetworkInterfaceType == NetworkInterfaceType.Unknown)
+				continue;
+			if (!adapter.Supports(NetworkInterfaceComponent.IPv4))
+				continue;
+			if (best == null)
+				best = adapter;
+			if (adapter.OperationalStatus != OperationalStatus.Up)
+				continue;
 
-		public static double Now { get { return (double)(Stopwatch.GetTimestamp() - s_timeInitialized) * s_dInvFreq; } }
-
-		private static NetworkInterface GetNetworkInterface()
-		{
-			var computerProperties = IPGlobalProperties.GetIPGlobalProperties();
-			if (computerProperties == null)
-				return null;
-
-			var nics = NetworkInterface.GetAllNetworkInterfaces();
-			if (nics == null || nics.Length < 1)
-				return null;
-
-			NetworkInterface best = null;
-			foreach (var adapter in nics)
-			{
-				if (adapter.NetworkInterfaceType == NetworkInterfaceType.Loopback || adapter.NetworkInterfaceType == NetworkInterfaceType.Unknown)
-					continue;
-				if (!adapter.Supports(NetworkInterfaceComponent.IPv4))
-					continue;
-				if (best == null)
-					best = adapter;
-				if (adapter.OperationalStatus != OperationalStatus.Up)
-					continue;
-
-				// make sure this adapter has any ipv4 addresses
-				var properties = adapter.GetIPProperties();
-				foreach (var unicastAddress in properties.UnicastAddresses)
-				{
-					if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
-					{
-						// Yes it does, return this network interface.
-						return adapter;
-					}
-				}
-			}
-			return best;
-		}
-
-		/// <summary>
-		/// If available, returns the bytes of the physical (MAC) address for the first usable network interface
-		/// </summary>
-		public static byte[] GetMacAddressBytes()
-		{
-			var ni = GetNetworkInterface();
-			if (ni == null)
-				return null;
-			return ni.GetPhysicalAddress().GetAddressBytes();
-		}
-
-		public static IPAddress GetBroadcastAddress()
-		{
-			var ni = GetNetworkInterface();
-			if (ni == null)
-				return null;
-
-			var properties = ni.GetIPProperties();
+			// make sure this adapter has any ipv4 addresses
+			var properties = adapter.GetIPProperties();
 			foreach (var unicastAddress in properties.UnicastAddresses)
 			{
 				if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
 				{
-					var mask = unicastAddress.IPv4Mask;
-					var ipAdressBytes = unicastAddress.Address.GetAddressBytes();
-					var subnetMaskBytes = mask.GetAddressBytes();
-
-					if (ipAdressBytes.Length != subnetMaskBytes.Length)
-						throw new ArgumentException("Lengths of IP address and subnet mask do not match.");
-
-					var broadcastAddress = new byte[ipAdressBytes.Length];
-					for (var i = 0; i < broadcastAddress.Length; i++)
-					{
-						broadcastAddress[i] = (byte)(ipAdressBytes[i] | (subnetMaskBytes[i] ^ 255));
-					}
-					return new IPAddress(broadcastAddress);
+					// Yes it does, return this network interface.
+					return adapter;
 				}
 			}
-			return IPAddress.Broadcast;
 		}
+		return best;
+	}
 
-		/// <summary>
-		/// Gets my local IPv4 address (not necessarily external) and subnet mask
-		/// </summary>
-		public static IPAddress GetMyAddress(out IPAddress mask)
+	/// <summary>
+	/// If available, returns the bytes of the physical (MAC) address for the first usable network interface
+	/// </summary>
+	public static byte[] GetMacAddressBytes()
+	{
+		var ni = GetNetworkInterface();
+		if (ni == null)
+			return null;
+		return ni.GetPhysicalAddress().GetAddressBytes();
+	}
+
+	public static IPAddress GetBroadcastAddress()
+	{
+		var ni = GetNetworkInterface();
+		if (ni == null)
+			return null;
+
+		var properties = ni.GetIPProperties();
+		foreach (var unicastAddress in properties.UnicastAddresses)
 		{
-			var ni = GetNetworkInterface();
-			if (ni == null)
+			if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
 			{
-				mask = null;
-				return null;
-			}
+				var mask = unicastAddress.IPv4Mask;
+				var ipAdressBytes = unicastAddress.Address.GetAddressBytes();
+				var subnetMaskBytes = mask.GetAddressBytes();
 
-			var properties = ni.GetIPProperties();
-			foreach (var unicastAddress in properties.UnicastAddresses)
-			{
-				if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
+				if (ipAdressBytes.Length != subnetMaskBytes.Length)
+					throw new ArgumentException("Lengths of IP address and subnet mask do not match.");
+
+				var broadcastAddress = new byte[ipAdressBytes.Length];
+				for (var i = 0; i < broadcastAddress.Length; i++)
 				{
-					mask = unicastAddress.IPv4Mask;
-					return unicastAddress.Address;
+					broadcastAddress[i] = (byte)(ipAdressBytes[i] | (subnetMaskBytes[i] ^ 255));
 				}
+				return new IPAddress(broadcastAddress);
 			}
+		}
+		return IPAddress.Broadcast;
+	}
 
+	/// <summary>
+	/// Gets my local IPv4 address (not necessarily external) and subnet mask
+	/// </summary>
+	public static IPAddress GetMyAddress(out IPAddress mask)
+	{
+		var ni = GetNetworkInterface();
+		if (ni == null)
+		{
 			mask = null;
 			return null;
 		}
 
-		public static void Sleep(int milliseconds)
+		var properties = ni.GetIPProperties();
+		foreach (var unicastAddress in properties.UnicastAddresses)
 		{
-			System.Threading.Thread.Sleep(milliseconds);
+			if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
+			{
+				mask = unicastAddress.IPv4Mask;
+				return unicastAddress.Address;
+			}
 		}
 
-		public static IPAddress CreateAddressFromBytes(byte[] bytes)
-		{
-			return new IPAddress(bytes);
-		}
-		
-		private static readonly SHA256 s_sha = SHA256.Create();
-		public static byte[] ComputeSHAHash(byte[] bytes, int offset, int count)
-		{
-			return s_sha.ComputeHash(bytes, offset, count);
-		}
+		mask = null;
+		return null;
 	}
 
-	public static partial class NetTime
+	public static void Sleep(int milliseconds)
 	{
-		private static readonly long s_timeInitialized = Stopwatch.GetTimestamp();
-		private static readonly double s_dInvFreq = 1.0 / (double)Stopwatch.Frequency;
-		
-		/// <summary>
-		/// Get number of seconds since the application started
-		/// </summary>
-		public static double Now { get { return (double)(Stopwatch.GetTimestamp() - s_timeInitialized) * s_dInvFreq; } }
+		System.Threading.Thread.Sleep(milliseconds);
 	}
+
+	public static IPAddress CreateAddressFromBytes(byte[] bytes)
+	{
+		return new IPAddress(bytes);
+	}
+		
+	private static readonly SHA256 s_sha = SHA256.Create();
+	public static byte[] ComputeSHAHash(byte[] bytes, int offset, int count)
+	{
+		return s_sha.ComputeHash(bytes, offset, count);
+	}
+}
+
+public static partial class NetTime
+{
+	private static readonly long s_timeInitialized = Stopwatch.GetTimestamp();
+	private static readonly double s_dInvFreq = 1.0 / (double)Stopwatch.Frequency;
+		
+	/// <summary>
+	/// Get number of seconds since the application started
+	/// </summary>
+	public static double Now { get { return (double)(Stopwatch.GetTimestamp() - s_timeInitialized) * s_dInvFreq; } }
 }
 #endif
