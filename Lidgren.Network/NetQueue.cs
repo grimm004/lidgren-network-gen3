@@ -17,9 +17,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
 using System;
-using System.Diagnostics;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 
 //
@@ -41,11 +42,11 @@ public sealed class NetQueue<T>
 	//
 	// [0] item
 	// [1] item (tail = ((head + size - 1) % capacity)
-	// [2] 
-	// [3] 
+	// [2]
+	// [3]
 	// [4] item (head)
 	// [5] item
-	// [6] item 
+	// [6] item
 	// [7] item
 	//
 	private T[] m_items;

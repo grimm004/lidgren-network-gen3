@@ -23,13 +23,11 @@ using NetAddress = System.Net.IPAddress;
 #endif
 
 using System;
+using System.Collections.Generic;
 using System.Net;
 
 using System.Net.Sockets;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Collections.Generic;
-using System.Security.Cryptography;
 
 namespace Lidgren.Network;
 

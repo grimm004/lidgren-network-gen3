@@ -1,7 +1,5 @@
-﻿using System;
-using System.Net;
+﻿using System.Diagnostics;
 using System.Threading;
-using System.Diagnostics;
 
 #if !__NOIPENDPOINT__
 using NetEndPoint = System.Net.IPEndPoint;

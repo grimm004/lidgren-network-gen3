@@ -1,11 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <LangVersion>10</LangVersion>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <Configurations>Release;Debug</Configurations>
-    <Platforms>x64</Platforms>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -80,11 +76,6 @@
     <Compile Include="..\Lidgren.Network\NetUPnP.cs" Link="NetUPnP.cs" />
     <Compile Include="..\Lidgren.Network\NetUtility.cs" Link="NetUtility.cs" />
     <Compile Include="..\Lidgren.Network\Platform\PlatformWin32.cs" Link="Platform\PlatformWin32.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Encryption\" />
-    <Folder Include="Platform\" />
   </ItemGroup>
 
   <ItemGroup>
