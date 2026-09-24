@@ -44,7 +44,7 @@ public class NetUPnP
 	private string m_serviceUrl;
 	private string m_serviceName = "";
 	private NetPeer m_peer;
-	private ManualResetEvent m_discoveryComplete = new ManualResetEvent(false);
+	private ManualResetEvent m_discoveryComplete = new(false);
 
 	internal double m_discoveryResponseDeadline;
 

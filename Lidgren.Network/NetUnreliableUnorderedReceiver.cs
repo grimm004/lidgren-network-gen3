@@ -1,14 +1,8 @@
 ﻿namespace Lidgren.Network;
 
-internal sealed class NetUnreliableUnorderedReceiver : NetReceiverChannelBase
+internal sealed class NetUnreliableUnorderedReceiver(NetConnection connection) : NetReceiverChannelBase(connection)
 {
-	private bool m_doFlowControl;
-
-	public NetUnreliableUnorderedReceiver(NetConnection connection)
-		: base(connection)
-	{
-		m_doFlowControl = connection.Peer.Configuration.SuppressUnreliableUnorderedAcks == false;
-	}
+	private bool m_doFlowControl = connection.Peer.Configuration.SuppressUnreliableUnorderedAcks == false;
 
 	internal override void ReceiveMessage(NetIncomingMessage msg)
 	{

@@ -14,10 +14,10 @@ internal class NetBigInteger
 	private const long IMASK = 0xffffffffL;
 	private const ulong UIMASK = (ulong)IMASK;
 
-	private static readonly int[] ZeroMagnitude = new int[0];
-	private static readonly byte[] ZeroEncoding = new byte[0];
+	private static readonly int[] ZeroMagnitude = [];
+	private static readonly byte[] ZeroEncoding = [];
 
-	public static readonly NetBigInteger Zero = new NetBigInteger(0, ZeroMagnitude, false);
+	public static readonly NetBigInteger Zero = new(0, ZeroMagnitude, false);
 	public static readonly NetBigInteger One = createUValueOf(1);
 	public static readonly NetBigInteger Two = createUValueOf(2);
 	public static readonly NetBigInteger Three = createUValueOf(3);
@@ -736,7 +736,7 @@ internal class NetBigInteger
 			}
 			else
 			{
-				iCount = new int[] { 1 };
+				iCount = [1];
 
 				var len = y.Length - yStart;
 				c = new int[len];
@@ -1726,7 +1726,7 @@ internal class NetBigInteger
 
 				return rem == 0
 					? Zero
-					: new NetBigInteger(m_sign, new int[] { rem }, false);
+					: new NetBigInteger(m_sign, [rem], false);
 			}
 		}
 
@@ -2232,11 +2232,11 @@ internal class NetBigInteger
 		var lsw = (int)value;
 
 		if (msw != 0)
-			return new NetBigInteger(1, new int[] { msw, lsw }, false);
+			return new NetBigInteger(1, [msw, lsw], false);
 
 		if (lsw != 0)
 		{
-			var n = new NetBigInteger(1, new int[] { lsw }, false);
+			var n = new NetBigInteger(1, [lsw], false);
 			// Check for a power of two
 			if ((lsw & -lsw) == lsw)
 			{

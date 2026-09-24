@@ -50,7 +50,7 @@ public partial class NetBuffer
 			// find the appropriate Write method
 			MethodInfo writeMethod;
 			if (s_writeMethods.TryGetValue(fi.FieldType, out writeMethod))
-				writeMethod.Invoke(this, new object[] { value });
+				writeMethod.Invoke(this, [value]);
 			else
 				throw new NetException("Failed to find write method for type " + fi.FieldType);
 		}
@@ -86,7 +86,7 @@ public partial class NetBuffer
 				// find the appropriate Write method
 				MethodInfo writeMethod;
 				if (s_writeMethods.TryGetValue(fi.PropertyType, out writeMethod))
-					writeMethod.Invoke(this, new object[] { value });
+					writeMethod.Invoke(this, [value]);
 			}
 		}
 	}

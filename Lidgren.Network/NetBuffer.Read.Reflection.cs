@@ -96,7 +96,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 				 // set the value
 				 var setMethod = fi.GetSetMethod();
 				 if (setMethod != null)
-					 setMethod.Invoke(target, new object[] { value });
+					 setMethod.Invoke(target, [value]);
 			 }
 		 }
 	 }

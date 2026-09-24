@@ -1,15 +1,9 @@
 ﻿namespace Lidgren.Network;
 
-internal sealed class NetReliableSequencedReceiver : NetReceiverChannelBase
+internal sealed class NetReliableSequencedReceiver(NetConnection connection, int windowSize)
+	: NetReceiverChannelBase(connection)
 {
 	private int m_windowStart;
-	private int m_windowSize;
-
-	public NetReliableSequencedReceiver(NetConnection connection, int windowSize)
-		: base(connection)
-	{
-		m_windowSize = windowSize;
-	}
 
 	private void AdvanceWindow()
 	{
@@ -46,7 +40,7 @@ internal sealed class NetReliableSequencedReceiver : NetReceiverChannelBase
 		}
 
 		// relate > 0 = early message
-		if (relate > m_windowSize)
+		if (relate > windowSize)
 		{
 			// too early message!
 			m_connection.m_statistics.MessageDropped();

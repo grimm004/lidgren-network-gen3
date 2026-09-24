@@ -62,7 +62,7 @@ public partial class NetPeer
 			// message must be fragmented!
 			if (recipient.m_status != NetConnectionStatus.Connected)
 				return NetSendResult.FailedNotConnected;
-			return SendFragmentedMessage(msg, new NetConnection[] { recipient }, method, sequenceChannel);
+			return SendFragmentedMessage(msg, [recipient], method, sequenceChannel);
 		}
 	}
 

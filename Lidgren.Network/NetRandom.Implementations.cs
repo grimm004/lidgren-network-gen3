@@ -11,7 +11,7 @@ public class MWCRandom : NetRandom
 	/// <summary>
 	/// Get global instance of MWCRandom
 	/// </summary>
-	public static new readonly MWCRandom Instance = new MWCRandom();
+	public static new readonly MWCRandom Instance = new();
 
 	private uint m_w, m_z;
 
@@ -63,7 +63,7 @@ public sealed class XorShiftRandom : NetRandom
 	/// <summary>
 	/// Get global instance of XorShiftRandom
 	/// </summary>
-	public static new readonly XorShiftRandom Instance = new XorShiftRandom();
+	public static new readonly XorShiftRandom Instance = new();
 
 	private const uint c_x = 123456789;
 	private const uint c_y = 362436069;
@@ -133,7 +133,7 @@ public sealed class MersenneTwisterRandom : NetRandom
 	/// <summary>
 	/// Get global instance of MersenneTwisterRandom
 	/// </summary>
-	public static new readonly MersenneTwisterRandom Instance = new MersenneTwisterRandom();
+	public static new readonly MersenneTwisterRandom Instance = new();
 
 	private const int N = 624;
 	private const int M = 397;
@@ -178,7 +178,7 @@ public sealed class MersenneTwisterRandom : NetRandom
 	{
 		mt = new UInt32[N];
 		mti = N + 1;
-		mag01 = new UInt32[] { 0x0U, MATRIX_A };
+		mag01 = [0x0U, MATRIX_A];
 		mt[0] = seed;
 		for (var i = 1; i < N; i++)
 			mt[i] = (UInt32)(1812433253 * (mt[i - 1] ^ (mt[i - 1] >> 30)) + i);
@@ -235,7 +235,7 @@ public class CryptoRandom : NetRandom
 	/// <summary>
 	/// Global instance of CryptoRandom
 	/// </summary>
-	public static new readonly CryptoRandom Instance = new CryptoRandom();
+	public static new readonly CryptoRandom Instance = new();
 
 	private RandomNumberGenerator m_rnd = RandomNumberGenerator.Create();
 

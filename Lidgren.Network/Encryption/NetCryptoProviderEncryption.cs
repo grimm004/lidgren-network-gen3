@@ -3,13 +3,8 @@ using System.Security.Cryptography;
 
 namespace Lidgren.Network;
 
-public abstract class NetCryptoProviderEncryption : NetEncryption
+public abstract class NetCryptoProviderEncryption(NetPeer peer) : NetEncryption(peer)
 {
-	public NetCryptoProviderEncryption(NetPeer peer)
-		: base(peer)
-	{
-	}
-
 	protected abstract CryptoStream GetEncryptStream(MemoryStream ms);
 
 	protected abstract CryptoStream GetDecryptStream(MemoryStream ms);

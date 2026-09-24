@@ -20,7 +20,7 @@ public partial class NetPeer
 	internal byte[] m_receiveBuffer;
 	internal NetIncomingMessage m_readHelperMessage;
 	private EndPoint m_senderRemote;
-	private object m_initializeLock = new object();
+	private object m_initializeLock = new();
 	private uint m_frameCounter;
 	private double m_lastHeartbeat;
 	private double m_lastSocketBind = float.MinValue;
@@ -55,7 +55,7 @@ public partial class NetPeer
 		if (syncContext == null)
 			throw new NetException("Need a SynchronizationContext to register callback on correct thread!");
 		if (m_receiveCallbacks == null)
-			m_receiveCallbacks = new List<NetTuple<SynchronizationContext, SendOrPostCallback>>();
+			m_receiveCallbacks = [];
 		m_receiveCallbacks.Add(new NetTuple<SynchronizationContext, SendOrPostCallback>(syncContext, callback));
 	}
 
@@ -151,7 +151,7 @@ public partial class NetPeer
 					const uint IOC_IN = 0x80000000;
 					const uint IOC_VENDOR = 0x18000000;
 					var SIO_UDP_CONNRESET = IOC_IN | IOC_VENDOR | 12;
-					m_socket.IOControl((int)SIO_UDP_CONNRESET, new byte[] { Convert.ToByte(false) }, null);
+					m_socket.IOControl((int)SIO_UDP_CONNRESET, [Convert.ToByte(false)], null);
 				}
 				catch
 				{

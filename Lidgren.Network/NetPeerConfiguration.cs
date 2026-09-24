@@ -379,7 +379,7 @@ public sealed class NetPeerConfiguration
 	public int Port
 	{
 		get { return m_port; }
-		set
+		init
 		{
 			if (m_isLocked)
 				throw new NetException(c_isLockedMessage);

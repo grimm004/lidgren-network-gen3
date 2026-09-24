@@ -1,13 +1,8 @@
 ﻿namespace Lidgren.Network;
 
-internal sealed class NetUnreliableSequencedReceiver : NetReceiverChannelBase
+internal sealed class NetUnreliableSequencedReceiver(NetConnection connection) : NetReceiverChannelBase(connection)
 {
 	private int m_lastReceivedSequenceNumber = -1;
-
-	public NetUnreliableSequencedReceiver(NetConnection connection)
-		: base(connection)
-	{
-	}
 
 	internal override void ReceiveMessage(NetIncomingMessage msg)
 	{

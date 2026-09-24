@@ -34,7 +34,7 @@ public partial class NetPeer
 {
 
 #if DEBUG
-	private readonly List<DelayedPacket> m_delayedPackets = new List<DelayedPacket>();
+	private readonly List<DelayedPacket> m_delayedPackets = new();
 
 	private class DelayedPacket
 	{
@@ -132,7 +132,7 @@ public partial class NetPeer
 	}
 
 	//Avoids allocation on mapping to IPv6
-	private IPEndPoint targetCopy = new IPEndPoint(IPAddress.Any, 0);
+	private IPEndPoint targetCopy = new(IPAddress.Any, 0);
 
 	internal bool ActuallySendPacket(byte[] data, int numBytes, NetEndPoint target, out bool connectionReset)
 	{

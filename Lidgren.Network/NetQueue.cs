@@ -50,7 +50,7 @@ public sealed class NetQueue<T>
 	// [7] item
 	//
 	private T[] m_items;
-	private readonly ReaderWriterLockSlim m_lock = new ReaderWriterLockSlim();
+	private readonly ReaderWriterLockSlim m_lock = new();
 	private int m_size;
 	private int m_head;
 

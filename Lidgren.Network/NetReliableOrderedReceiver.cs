@@ -1,23 +1,15 @@
 ﻿namespace Lidgren.Network;
 
-internal sealed class NetReliableOrderedReceiver : NetReceiverChannelBase
+internal sealed class NetReliableOrderedReceiver(NetConnection connection, int windowSize)
+	: NetReceiverChannelBase(connection)
 {
 	private int m_windowStart;
-	private int m_windowSize;
-	private NetBitVector m_earlyReceived;
-	internal NetIncomingMessage[] m_withheldMessages;
-
-	public NetReliableOrderedReceiver(NetConnection connection, int windowSize)
-		: base(connection)
-	{
-		m_windowSize = windowSize;
-		m_withheldMessages = new NetIncomingMessage[windowSize];
-		m_earlyReceived = new NetBitVector(windowSize);
-	}
+	private NetBitVector m_earlyReceived = new(windowSize);
+	internal NetIncomingMessage[] m_withheldMessages = new NetIncomingMessage[windowSize];
 
 	private void AdvanceWindow()
 	{
-		m_earlyReceived.Set(m_windowStart % m_windowSize, false);
+		m_earlyReceived.Set(m_windowStart % windowSize, false);
 		m_windowStart = (m_windowStart + 1) % NetConstants.NumSequenceNumbers;
 	}
 
@@ -43,13 +35,13 @@ internal sealed class NetReliableOrderedReceiver : NetReceiverChannelBase
 			// release withheld messages
 			var nextSeqNr = (message.m_sequenceNumber + 1) % NetConstants.NumSequenceNumbers;
 
-			while (m_earlyReceived[nextSeqNr % m_windowSize])
+			while (m_earlyReceived[nextSeqNr % windowSize])
 			{
-				message = m_withheldMessages[nextSeqNr % m_windowSize];
+				message = m_withheldMessages[nextSeqNr % windowSize];
 				NetException.Assert(message != null);
 
 				// remove it from withheld messages
-				m_withheldMessages[nextSeqNr % m_windowSize] = null;
+				m_withheldMessages[nextSeqNr % windowSize] = null;
 
 				m_peer.LogVerbose("Releasing withheld message #" + message);
 
@@ -71,7 +63,7 @@ internal sealed class NetReliableOrderedReceiver : NetReceiverChannelBase
 		}
 
 		// relate > 0 = early message
-		if (relate > m_windowSize)
+		if (relate > windowSize)
 		{
 			// too early message!
 			m_connection.m_statistics.MessageDropped();
@@ -79,8 +71,8 @@ internal sealed class NetReliableOrderedReceiver : NetReceiverChannelBase
 			return;
 		}
 
-		m_earlyReceived.Set(message.m_sequenceNumber % m_windowSize, true);
+		m_earlyReceived.Set(message.m_sequenceNumber % windowSize, true);
 		m_peer.LogVerbose("Received " + message + " WITHHOLDING, waiting for " + m_windowStart);
-		m_withheldMessages[message.m_sequenceNumber % m_windowSize] = message;
+		m_withheldMessages[message.m_sequenceNumber % windowSize] = message;
 	}
 }

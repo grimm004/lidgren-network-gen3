@@ -18,7 +18,7 @@ public partial class NetPeer
 
 	private int m_listenPort;
 	private object m_tag;
-	private object m_messageReceivedEventCreationLock = new object();
+	private object m_messageReceivedEventCreationLock = new();
 
 	internal readonly List<NetConnection> m_connections;
 	private readonly Dictionary<NetEndPoint, NetConnection> m_connectionLookup;
