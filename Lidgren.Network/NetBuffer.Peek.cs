@@ -27,7 +27,7 @@ public partial class NetBuffer
 	/// <summary>
 	/// Gets the internal data buffer
 	/// </summary>
-	public byte[] PeekDataBuffer() { return m_data; }
+	public byte[] PeekDataBuffer() { return DataBuffer; }
 
 	//
 	// 1 bit
@@ -37,21 +37,21 @@ public partial class NetBuffer
 	/// </summary>
 	public bool PeekBoolean()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 1, c_readOverflowError);
-		var retval = NetBitWriter.ReadByte(m_data, 1, m_readPosition);
-		return (retval > 0 ? true : false);
+		NetException.Assert(BitLength - ReadPosition >= 1, ReadOverflowError);
+		var retval = NetBitWriter.ReadByte(DataBuffer, 1, ReadPosition);
+		return retval > 0;
 	}
 
 	//
-	// 8 bit 
+	// 8 bit
 	//
 	/// <summary>
 	/// Reads a Byte without advancing the read pointer
 	/// </summary>
 	public byte PeekByte()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 8, c_readOverflowError);
-		var retval = NetBitWriter.ReadByte(m_data, 8, m_readPosition);
+		NetException.Assert(BitLength - ReadPosition >= 8, ReadOverflowError);
+		var retval = NetBitWriter.ReadByte(DataBuffer, 8, ReadPosition);
 		return retval;
 	}
 
@@ -61,8 +61,8 @@ public partial class NetBuffer
 	[CLSCompliant(false)]
 	public sbyte PeekSByte()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 8, c_readOverflowError);
-		var retval = NetBitWriter.ReadByte(m_data, 8, m_readPosition);
+		NetException.Assert(BitLength - ReadPosition >= 8, ReadOverflowError);
+		var retval = NetBitWriter.ReadByte(DataBuffer, 8, ReadPosition);
 		return (sbyte)retval;
 	}
 
@@ -71,7 +71,7 @@ public partial class NetBuffer
 	/// </summary>
 	public byte PeekByte(int numberOfBits)
 	{
-		var retval = NetBitWriter.ReadByte(m_data, numberOfBits, m_readPosition);
+		var retval = NetBitWriter.ReadByte(DataBuffer, numberOfBits, ReadPosition);
 		return retval;
 	}
 
@@ -80,10 +80,10 @@ public partial class NetBuffer
 	/// </summary>
 	public byte[] PeekBytes(int numberOfBytes)
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= (numberOfBytes * 8), c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= numberOfBytes * 8, ReadOverflowError);
 
 		var retval = new byte[numberOfBytes];
-		NetBitWriter.ReadBytes(m_data, numberOfBytes, m_readPosition, retval, 0);
+		NetBitWriter.ReadBytes(DataBuffer, numberOfBytes, ReadPosition, retval, 0);
 		return retval;
 	}
 
@@ -92,11 +92,10 @@ public partial class NetBuffer
 	/// </summary>
 	public void PeekBytes(byte[] into, int offset, int numberOfBytes)
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= (numberOfBytes * 8), c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= numberOfBytes * 8, ReadOverflowError);
 		NetException.Assert(offset + numberOfBytes <= into.Length);
 
-		NetBitWriter.ReadBytes(m_data, numberOfBytes, m_readPosition, into, offset);
-		return;
+		NetBitWriter.ReadBytes(DataBuffer, numberOfBytes, ReadPosition, into, offset);
 	}
 
 	//
@@ -105,10 +104,10 @@ public partial class NetBuffer
 	/// <summary>
 	/// Reads an Int16 without advancing the read pointer
 	/// </summary>
-	public Int16 PeekInt16()
+	public short PeekInt16()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 16, c_readOverflowError);
-		uint retval = NetBitWriter.ReadUInt16(m_data, 16, m_readPosition);
+		NetException.Assert(BitLength - ReadPosition >= 16, ReadOverflowError);
+		uint retval = NetBitWriter.ReadUInt16(DataBuffer, 16, ReadPosition);
 		return (short)retval;
 	}
 
@@ -116,10 +115,10 @@ public partial class NetBuffer
 	/// Reads a UInt16 without advancing the read pointer
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt16 PeekUInt16()
+	public ushort PeekUInt16()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 16, c_readOverflowError);
-		uint retval = NetBitWriter.ReadUInt16(m_data, 16, m_readPosition);
+		NetException.Assert(BitLength - ReadPosition >= 16, ReadOverflowError);
+		uint retval = NetBitWriter.ReadUInt16(DataBuffer, 16, ReadPosition);
 		return (ushort)retval;
 	}
 
@@ -129,22 +128,22 @@ public partial class NetBuffer
 	/// <summary>
 	/// Reads an Int32 without advancing the read pointer
 	/// </summary>
-	public Int32 PeekInt32()
+	public int PeekInt32()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 32, c_readOverflowError);
-		var retval = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-		return (Int32)retval;
+		NetException.Assert(BitLength - ReadPosition >= 32, ReadOverflowError);
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+		return (int)retval;
 	}
 
 	/// <summary>
 	/// Reads the specified number of bits into an Int32 without advancing the read pointer
 	/// </summary>
-	public Int32 PeekInt32(int numberOfBits)
+	public int PeekInt32(int numberOfBits)
 	{
-		NetException.Assert((numberOfBits > 0 && numberOfBits <= 32), "ReadInt() can only read between 1 and 32 bits");
-		NetException.Assert(m_bitLength - m_readPosition >= numberOfBits, c_readOverflowError);
+		NetException.Assert(numberOfBits is > 0 and <= 32, "ReadInt() can only read between 1 and 32 bits");
+		NetException.Assert(BitLength - ReadPosition >= numberOfBits, ReadOverflowError);
 
-		var retval = NetBitWriter.ReadUInt32(m_data, numberOfBits, m_readPosition);
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, numberOfBits, ReadPosition);
 
 		if (numberOfBits == 32)
 			return (int)retval;
@@ -156,9 +155,9 @@ public partial class NetBuffer
 		// negative
 		unchecked
 		{
-			var mask = ((uint)-1) >> (33 - numberOfBits);
+			var mask = (uint)-1 >> (33 - numberOfBits);
 			var tmp = (retval & mask) + 1;
-			return -((int)tmp);
+			return -(int)tmp;
 		}
 	}
 
@@ -166,10 +165,10 @@ public partial class NetBuffer
 	/// Reads a UInt32 without advancing the read pointer
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt32 PeekUInt32()
+	public uint PeekUInt32()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 32, c_readOverflowError);
-		var retval = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
+		NetException.Assert(BitLength - ReadPosition >= 32, ReadOverflowError);
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
 		return retval;
 	}
 
@@ -177,12 +176,12 @@ public partial class NetBuffer
 	/// Reads the specified number of bits into a UInt32 without advancing the read pointer
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt32 PeekUInt32(int numberOfBits)
+	public uint PeekUInt32(int numberOfBits)
 	{
-		NetException.Assert((numberOfBits > 0 && numberOfBits <= 32), "ReadUInt() can only read between 1 and 32 bits");
+		NetException.Assert(numberOfBits is > 0 and <= 32, "ReadUInt() can only read between 1 and 32 bits");
 		//NetException.Assert(m_bitLength - m_readBitPtr >= numberOfBits, "tried to read past buffer size");
 
-		var retval = NetBitWriter.ReadUInt32(m_data, numberOfBits, m_readPosition);
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, numberOfBits, ReadPosition);
 		return retval;
 	}
 
@@ -193,12 +192,12 @@ public partial class NetBuffer
 	/// Reads a UInt64 without advancing the read pointer
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt64 PeekUInt64()
+	public ulong PeekUInt64()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 64, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 64, ReadOverflowError);
 
-		ulong low = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-		ulong high = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition + 32);
+		ulong low = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+		ulong high = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition + 32);
 
 		var retval = low + (high << 32);
 
@@ -208,9 +207,9 @@ public partial class NetBuffer
 	/// <summary>
 	/// Reads an Int64 without advancing the read pointer
 	/// </summary>
-	public Int64 PeekInt64()
+	public long PeekInt64()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 64, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 64, ReadOverflowError);
 		unchecked
 		{
 			var retval = PeekUInt64();
@@ -223,20 +222,20 @@ public partial class NetBuffer
 	/// Reads the specified number of bits into an UInt64 without advancing the read pointer
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt64 PeekUInt64(int numberOfBits)
+	public ulong PeekUInt64(int numberOfBits)
 	{
-		NetException.Assert((numberOfBits > 0 && numberOfBits <= 64), "ReadUInt() can only read between 1 and 64 bits");
-		NetException.Assert(m_bitLength - m_readPosition >= numberOfBits, c_readOverflowError);
+		NetException.Assert(numberOfBits is > 0 and <= 64, "ReadUInt() can only read between 1 and 64 bits");
+		NetException.Assert(BitLength - ReadPosition >= numberOfBits, ReadOverflowError);
 
 		ulong retval;
 		if (numberOfBits <= 32)
 		{
-			retval = (ulong)NetBitWriter.ReadUInt32(m_data, numberOfBits, m_readPosition);
+			retval = NetBitWriter.ReadUInt32(DataBuffer, numberOfBits, ReadPosition);
 		}
 		else
 		{
-			retval = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-			retval |= (UInt64)NetBitWriter.ReadUInt32(m_data, numberOfBits - 32, m_readPosition + 32) << 32;
+			retval = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+			retval |= (ulong)NetBitWriter.ReadUInt32(DataBuffer, numberOfBits - 32, ReadPosition + 32) << 32;
 		}
 		return retval;
 	}
@@ -244,9 +243,9 @@ public partial class NetBuffer
 	/// <summary>
 	/// Reads the specified number of bits into an Int64 without advancing the read pointer
 	/// </summary>
-	public Int64 PeekInt64(int numberOfBits)
+	public long PeekInt64(int numberOfBits)
 	{
-		NetException.Assert(((numberOfBits > 0) && (numberOfBits < 65)), "ReadInt64(bits) can only read between 1 and 64 bits");
+		NetException.Assert(numberOfBits is > 0 and < 65, "ReadInt64(bits) can only read between 1 and 64 bits");
 		return (long)PeekUInt64(numberOfBits);
 	}
 
@@ -266,11 +265,11 @@ public partial class NetBuffer
 	/// </summary>
 	public float PeekSingle()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 32, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 32, ReadOverflowError);
 
-		if ((m_readPosition & 7) == 0) // read directly
+		if ((ReadPosition & 7) == 0) // read directly
 		{
-			var retval = BitConverter.ToSingle(m_data, m_readPosition >> 3);
+			var retval = BitConverter.ToSingle(DataBuffer, ReadPosition >> 3);
 			return retval;
 		}
 
@@ -283,12 +282,12 @@ public partial class NetBuffer
 	/// </summary>
 	public double PeekDouble()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 64, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 64, ReadOverflowError);
 
-		if ((m_readPosition & 7) == 0) // read directly
+		if ((ReadPosition & 7) == 0) // read directly
 		{
 			// read directly
-			var retval = BitConverter.ToDouble(m_data, m_readPosition >> 3);
+			var retval = BitConverter.ToDouble(DataBuffer, ReadPosition >> 3);
 			return retval;
 		}
 
@@ -301,9 +300,9 @@ public partial class NetBuffer
 	/// </summary>
 	public string PeekString()
 	{
-		var wasReadPosition = m_readPosition;
+		var wasReadPosition = ReadPosition;
 		var retval = ReadString();
-		m_readPosition = wasReadPosition;
+		ReadPosition = wasReadPosition;
 		return retval;
 	}
 }

@@ -4,91 +4,94 @@ namespace Lidgren.Network;
 
 public partial class NetPeer
 {
-	internal List<byte[]> m_storagePool;
-	private NetQueue<NetOutgoingMessage> m_outgoingMessagesPool;
-	private NetQueue<NetIncomingMessage> m_incomingMessagesPool;
+	internal List<byte[]> StoragePool;
+	private NetQueue<NetOutgoingMessage> _outgoingMessagesPool;
+	private NetQueue<NetIncomingMessage> _incomingMessagesPool;
 
-	internal int m_storagePoolBytes;
-	internal int m_storageSlotsUsedCount;
-	private int m_maxCacheCount;
+	internal int StoragePoolBytes;
+	internal int StorageSlotsUsedCount;
+	private int _maxCacheCount;
 
 	private void InitializePools()
 	{
-		m_storageSlotsUsedCount = 0;
+		// ReSharper disable once InconsistentlySynchronizedField
+		StorageSlotsUsedCount = 0;
 
-		if (m_configuration.UseMessageRecycling)
+		if (PeerConfiguration.UseMessageRecycling)
 		{
-			m_storagePool = new List<byte[]>(16);
-			m_outgoingMessagesPool = new NetQueue<NetOutgoingMessage>(4);
-			m_incomingMessagesPool = new NetQueue<NetIncomingMessage>(4);
+			// ReSharper disable once InconsistentlySynchronizedField
+			StoragePool = new List<byte[]>(16);
+			_outgoingMessagesPool = new NetQueue<NetOutgoingMessage>(4);
+			_incomingMessagesPool = new NetQueue<NetIncomingMessage>(4);
 		}
 		else
 		{
-			m_storagePool = null;
-			m_outgoingMessagesPool = null;
-			m_incomingMessagesPool = null;
+			// ReSharper disable once InconsistentlySynchronizedField
+			StoragePool = null;
+			_outgoingMessagesPool = null;
+			_incomingMessagesPool = null;
 		}
 
-		m_maxCacheCount = m_configuration.RecycledCacheMaxCount;
+		_maxCacheCount = PeerConfiguration.RecycledCacheMaxCount;
 	}
 
 	internal byte[] GetStorage(int minimumCapacityInBytes)
 	{
-		if (m_storagePool == null)
+		if (StoragePool == null)
 			return new byte[minimumCapacityInBytes];
 
-		lock (m_storagePool)
+		lock (StoragePool)
 		{
-			for (var i = 0; i < m_storagePool.Count; i++)
+			for (var i = 0; i < StoragePool.Count; i++)
 			{
-				var retval = m_storagePool[i];
+				var retval = StoragePool[i];
 				if (retval != null && retval.Length >= minimumCapacityInBytes)
 				{
-					m_storagePool[i] = null;
-					m_storageSlotsUsedCount--;
-					m_storagePoolBytes -= retval.Length;
+					StoragePool[i] = null;
+					StorageSlotsUsedCount--;
+					StoragePoolBytes -= retval.Length;
 					return retval;
 				}
 			}
 		}
-		m_statistics.m_bytesAllocated += minimumCapacityInBytes;
+		_statistics.StorageBytesAllocated += minimumCapacityInBytes;
 		return new byte[minimumCapacityInBytes];
 	}
 
 	internal void Recycle(byte[] storage)
 	{
-		if (m_storagePool == null || storage == null)
+		if (StoragePool == null || storage == null)
 			return;
 
-		lock (m_storagePool)
+		lock (StoragePool)
 		{
-			var cnt = m_storagePool.Count;
+			var cnt = StoragePool.Count;
 			for (var i = 0; i < cnt; i++)
 			{
-				if (m_storagePool[i] == null)
+				if (StoragePool[i] == null)
 				{
-					m_storageSlotsUsedCount++;
-					m_storagePoolBytes += storage.Length;
-					m_storagePool[i] = storage;
+					StorageSlotsUsedCount++;
+					StoragePoolBytes += storage.Length;
+					StoragePool[i] = storage;
 					return;
 				}
 			}
 
-			if (m_storagePool.Count >= m_maxCacheCount)
+			if (StoragePool.Count >= _maxCacheCount)
 			{
 				// pool is full; replace randomly chosen entry to keep size distribution
-				var idx = NetRandom.Instance.Next(m_storagePool.Count);
+				var idx = NetRandom.Instance.Next(StoragePool.Count);
 
-				m_storagePoolBytes -= m_storagePool[idx].Length;
-				m_storagePoolBytes += storage.Length;
-					
-				m_storagePool[idx] = storage; // replace
+				StoragePoolBytes -= StoragePool[idx].Length;
+				StoragePoolBytes += storage.Length;
+
+				StoragePool[idx] = storage; // replace
 			}
 			else
 			{
-				m_storageSlotsUsedCount++;
-				m_storagePoolBytes += storage.Length;
-				m_storagePool.Add(storage);
+				StorageSlotsUsedCount++;
+				StoragePoolBytes += storage.Length;
+				StoragePool.Add(storage);
 			}
 		}
 	}
@@ -98,7 +101,7 @@ public partial class NetPeer
 	/// </summary>
 	public NetOutgoingMessage CreateMessage()
 	{
-		return CreateMessage(m_configuration.m_defaultOutgoingMessageCapacity);
+		return CreateMessage(PeerConfiguration.DefaultOutgoingMessageCapacity);
 	}
 
 	/// <summary>
@@ -107,7 +110,7 @@ public partial class NetPeer
 	public NetOutgoingMessage CreateMessage(string content)
 	{
 		NetOutgoingMessage om;
-	
+
 		// Since this could be null.
 		if (string.IsNullOrEmpty(content))
 		{
@@ -117,7 +120,7 @@ public partial class NetPeer
 		{
 			om = CreateMessage(2 + content.Length); // Fair guess.
 		}
-	
+
 		om.Write(content);
 		return om;
 	}
@@ -129,13 +132,13 @@ public partial class NetPeer
 	public NetOutgoingMessage CreateMessage(int initialCapacity)
 	{
 		NetOutgoingMessage retval;
-		if (m_outgoingMessagesPool == null || !m_outgoingMessagesPool.TryDequeue(out retval))
+		if (_outgoingMessagesPool == null || !_outgoingMessagesPool.TryDequeue(out retval))
 			retval = new NetOutgoingMessage();
 
-		NetException.Assert(retval.m_recyclingCount == 0, "Wrong recycling count! Should be zero" + retval.m_recyclingCount);
+		NetException.Assert(retval.RecyclingCount == 0, "Wrong recycling count! Should be zero" + retval.RecyclingCount);
 
 		if (initialCapacity > 0)
-			retval.m_data = GetStorage(initialCapacity);
+			retval.DataBuffer = GetStorage(initialCapacity);
 
 		return retval;
 	}
@@ -143,22 +146,22 @@ public partial class NetPeer
 	internal NetIncomingMessage CreateIncomingMessage(NetIncomingMessageType tp, byte[] useStorageData)
 	{
 		NetIncomingMessage retval;
-		if (m_incomingMessagesPool == null || !m_incomingMessagesPool.TryDequeue(out retval))
+		if (_incomingMessagesPool == null || !_incomingMessagesPool.TryDequeue(out retval))
 			retval = new NetIncomingMessage(tp);
 		else
-			retval.m_incomingMessageType = tp;
-		retval.m_data = useStorageData;
+			retval.IncomingMessageType = tp;
+		retval.DataBuffer = useStorageData;
 		return retval;
 	}
 
 	internal NetIncomingMessage CreateIncomingMessage(NetIncomingMessageType tp, int minimumByteSize)
 	{
 		NetIncomingMessage retval;
-		if (m_incomingMessagesPool == null || !m_incomingMessagesPool.TryDequeue(out retval))
+		if (_incomingMessagesPool == null || !_incomingMessagesPool.TryDequeue(out retval))
 			retval = new NetIncomingMessage(tp);
 		else
-			retval.m_incomingMessageType = tp;
-		retval.m_data = GetStorage(minimumByteSize);
+			retval.IncomingMessageType = tp;
+		retval.DataBuffer = GetStorage(minimumByteSize);
 		return retval;
 	}
 
@@ -167,18 +170,18 @@ public partial class NetPeer
 	/// </summary>
 	public void Recycle(NetIncomingMessage msg)
 	{
-		if (m_incomingMessagesPool == null || msg == null)
+		if (_incomingMessagesPool == null || msg == null)
 			return;
 
-		NetException.Assert(m_incomingMessagesPool.Contains(msg) == false, "Recyling already recycled incoming message! Thread race?");
+		NetException.Assert(_incomingMessagesPool.Contains(msg) == false, "Recyling already recycled incoming message! Thread race?");
 
-		var storage = msg.m_data;
-		msg.m_data = null;
+		var storage = msg.DataBuffer;
+		msg.DataBuffer = null;
 		Recycle(storage);
 		msg.Reset();
 
-		if (m_incomingMessagesPool.Count < m_maxCacheCount)
-			m_incomingMessagesPool.Enqueue(msg);
+		if (_incomingMessagesPool.Count < _maxCacheCount)
+			_incomingMessagesPool.Enqueue(msg);
 	}
 
 	/// <summary>
@@ -186,7 +189,7 @@ public partial class NetPeer
 	/// </summary>
 	public void Recycle(IEnumerable<NetIncomingMessage> toRecycle)
 	{
-		if (m_incomingMessagesPool == null)
+		if (_incomingMessagesPool == null)
 			return;
 		foreach (var im in toRecycle)
 			Recycle(im);
@@ -194,28 +197,28 @@ public partial class NetPeer
 
 	internal void Recycle(NetOutgoingMessage msg)
 	{
-		if (m_outgoingMessagesPool == null)
+		if (_outgoingMessagesPool == null)
 			return;
 #if DEBUG
-		NetException.Assert(m_outgoingMessagesPool.Contains(msg) == false, "Recyling already recycled outgoing message! Thread race?");
-		if (msg.m_recyclingCount != 0)
-			LogWarning("Wrong recycling count! should be zero; found " + msg.m_recyclingCount);
+		NetException.Assert(_outgoingMessagesPool.Contains(msg) == false, "Recyling already recycled outgoing message! Thread race?");
+		if (msg.RecyclingCount != 0)
+			LogWarning("Wrong recycling count! should be zero; found " + msg.RecyclingCount);
 #endif
 		// setting m_recyclingCount to zero SHOULD be an unnecessary maneuver, if it's not zero something is wrong
 		// however, in RELEASE, we'll just have to accept this and move on with life
-		msg.m_recyclingCount = 0;
+		msg.RecyclingCount = 0;
 
-		var storage = msg.m_data;
-		msg.m_data = null;
+		var storage = msg.DataBuffer;
+		msg.DataBuffer = null;
 
 		// message fragments cannot be recycled
 		// TODO: find a way to recycle large message after all fragments has been acknowledged; or? possibly better just to garbage collect them
-		if (msg.m_fragmentGroup == 0)
+		if (msg.FragmentGroup == 0)
 			Recycle(storage);
 
 		msg.Reset();
-		if (m_outgoingMessagesPool.Count < m_maxCacheCount)
-			m_outgoingMessagesPool.Enqueue(msg);
+		if (_outgoingMessagesPool.Count < _maxCacheCount)
+			_outgoingMessagesPool.Enqueue(msg);
 	}
 
 	/// <summary>

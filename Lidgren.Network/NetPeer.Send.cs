@@ -30,43 +30,41 @@ public partial class NetPeer
 	/// <param name="sequenceChannel">Sequence channel within the delivery method</param>
 	public NetSendResult SendMessage(NetOutgoingMessage msg, NetConnection recipient, NetDeliveryMethod method, int sequenceChannel)
 	{
-		if (msg == null)
-			throw new ArgumentNullException("msg");
-		if (recipient == null)
-			throw new ArgumentNullException("recipient");
-		if (sequenceChannel >= NetConstants.NetChannelsPerDeliveryMethod)
+        ArgumentNullException.ThrowIfNull(msg);
+        ArgumentNullException.ThrowIfNull(recipient);
+        if (sequenceChannel >= NetConstants.NetChannelsPerDeliveryMethod)
 			throw new ArgumentOutOfRangeException("sequenceChannel");
 
 		NetException.Assert(
-			((method != NetDeliveryMethod.Unreliable && method != NetDeliveryMethod.ReliableUnordered) ||
-			 ((method == NetDeliveryMethod.Unreliable || method == NetDeliveryMethod.ReliableUnordered) && sequenceChannel == 0)),
+			(method != NetDeliveryMethod.Unreliable && method != NetDeliveryMethod.ReliableUnordered) ||
+			sequenceChannel == 0,
 			"Delivery method " + method + " cannot use sequence channels other than 0!"
 		);
 
 		NetException.Assert(method != NetDeliveryMethod.Unknown, "Bad delivery method!");
 
-		if (msg.m_isSent)
+		if (msg.IsSent)
 			throw new NetException("This message has already been sent! Use NetPeer.SendMessage() to send to multiple recipients efficiently");
-		msg.m_isSent = true;
+		msg.IsSent = true;
 
-		var suppressFragmentation = (method == NetDeliveryMethod.Unreliable || method == NetDeliveryMethod.UnreliableSequenced) && m_configuration.UnreliableSizeBehaviour != NetUnreliableSizeBehaviour.NormalFragmentation;
+		var suppressFragmentation = method is NetDeliveryMethod.Unreliable or NetDeliveryMethod.UnreliableSequenced && PeerConfiguration.UnreliableSizeBehaviour != NetUnreliableSizeBehaviour.NormalFragmentation;
 
 		var len = NetConstants.UnfragmentedMessageHeaderSize + msg.LengthBytes; // headers + length, faster than calling msg.GetEncodedSize
-		if (len <= recipient.m_currentMTU || suppressFragmentation)
+		if (len <= recipient.CurrentMtuValue || suppressFragmentation)
 		{
-			Interlocked.Increment(ref msg.m_recyclingCount);
+			Interlocked.Increment(ref msg.RecyclingCount);
 			return recipient.EnqueueMessage(msg, method, sequenceChannel);
 		}
 		else
 		{
 			// message must be fragmented!
-			if (recipient.m_status != NetConnectionStatus.Connected)
+			if (recipient.ConnectionStatus != NetConnectionStatus.Connected)
 				return NetSendResult.FailedNotConnected;
 			return SendFragmentedMessage(msg, [recipient], method, sequenceChannel);
 		}
 	}
 
-	internal static int GetMTU(IList<NetConnection> recipients)
+	internal static int GetMtu(IList<NetConnection> recipients)
 	{
 		var count = recipients.Count;
 
@@ -84,7 +82,7 @@ public partial class NetPeer
 		for(var i=0;i<count;i++)
 		{
 			var conn = recipients[i];
-			var cmtu = conn.m_currentMTU;
+			var cmtu = conn.CurrentMtuValue;
 			if (cmtu < mtu)
 				mtu = cmtu;
 		}
@@ -100,42 +98,41 @@ public partial class NetPeer
 	/// <param name="sequenceChannel">Sequence channel within the delivery method</param>
 	public void SendMessage(NetOutgoingMessage msg, IList<NetConnection> recipients, NetDeliveryMethod method, int sequenceChannel)
 	{
-		if (msg == null)
-			throw new ArgumentNullException("msg");
-		if (recipients == null)
+        ArgumentNullException.ThrowIfNull(msg);
+        if (recipients == null)
 		{
-			if (msg.m_isSent == false)
+			if (msg.IsSent == false)
 				Recycle(msg);
 			throw new ArgumentNullException("recipients");
 		}
 		if (recipients.Count < 1)
 		{
-			if (msg.m_isSent == false)
+			if (msg.IsSent == false)
 				Recycle(msg);
 			throw new NetException("recipients must contain at least one item");
 		}
-		if (method == NetDeliveryMethod.Unreliable || method == NetDeliveryMethod.ReliableUnordered)
+		if (method is NetDeliveryMethod.Unreliable or NetDeliveryMethod.ReliableUnordered)
 			NetException.Assert(sequenceChannel == 0, "Delivery method " + method + " cannot use sequence channels other than 0!");
-		if (msg.m_isSent)
+		if (msg.IsSent)
 			throw new NetException("This message has already been sent! Use NetPeer.SendMessage() to send to multiple recipients efficiently");
-		msg.m_isSent = true;
+		msg.IsSent = true;
 
-		var mtu = GetMTU(recipients);
+		var mtu = GetMtu(recipients);
 
 		var len = msg.GetEncodedSize();
 		if (len <= mtu)
 		{
-			Interlocked.Add(ref msg.m_recyclingCount, recipients.Count);
+			Interlocked.Add(ref msg.RecyclingCount, recipients.Count);
 			foreach (var conn in recipients)
 			{
 				if (conn == null)
 				{
-					Interlocked.Decrement(ref msg.m_recyclingCount);
+					Interlocked.Decrement(ref msg.RecyclingCount);
 					continue;
 				}
 				var res = conn.EnqueueMessage(msg, method, sequenceChannel);
 				if (res == NetSendResult.Dropped)
-					Interlocked.Decrement(ref msg.m_recyclingCount);
+					Interlocked.Decrement(ref msg.RecyclingCount);
 			}
 		}
 		else
@@ -143,8 +140,6 @@ public partial class NetPeer
 			// message must be fragmented!
 			SendFragmentedMessage(msg, recipients, method, sequenceChannel);
 		}
-
-		return;
 	}
 
 	/// <summary>
@@ -152,24 +147,22 @@ public partial class NetPeer
 	/// </summary>
 	public void SendUnconnectedMessage(NetOutgoingMessage msg, string host, int port)
 	{
-		if (msg == null)
-			throw new ArgumentNullException("msg");
-		if (host == null)
-			throw new ArgumentNullException("host");
-		if (msg.m_isSent)
+        ArgumentNullException.ThrowIfNull(msg);
+        ArgumentNullException.ThrowIfNull(host);
+        if (msg.IsSent)
 			throw new NetException("This message has already been sent! Use NetPeer.SendMessage() to send to multiple recipients efficiently");
-		if (msg.LengthBytes > m_configuration.MaximumTransmissionUnit)
-			throw new NetException("Unconnected messages too long! Must be shorter than NetConfiguration.MaximumTransmissionUnit (currently " + m_configuration.MaximumTransmissionUnit + ")");
+		if (msg.LengthBytes > PeerConfiguration.MaximumTransmissionUnit)
+			throw new NetException("Unconnected messages too long! Must be shorter than NetConfiguration.MaximumTransmissionUnit (currently " + PeerConfiguration.MaximumTransmissionUnit + ")");
 
-		msg.m_isSent = true;
-		msg.m_messageType = NetMessageType.Unconnected;
+		msg.IsSent = true;
+		msg.MessageType = NetMessageType.Unconnected;
 
 		var adr = NetUtility.Resolve(host);
 		if (adr == null)
 			throw new NetException("Failed to resolve " + host);
 
-		Interlocked.Increment(ref msg.m_recyclingCount);
-		m_unsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(new NetEndPoint(adr, port), msg));
+		Interlocked.Increment(ref msg.RecyclingCount);
+		UnsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(new NetEndPoint(adr, port), msg));
 	}
 
 	/// <summary>
@@ -177,20 +170,18 @@ public partial class NetPeer
 	/// </summary>
 	public void SendUnconnectedMessage(NetOutgoingMessage msg, NetEndPoint recipient)
 	{
-		if (msg == null)
-			throw new ArgumentNullException("msg");
-		if (recipient == null)
-			throw new ArgumentNullException("recipient");
-		if (msg.m_isSent)
+        ArgumentNullException.ThrowIfNull(msg);
+        ArgumentNullException.ThrowIfNull(recipient);
+        if (msg.IsSent)
 			throw new NetException("This message has already been sent! Use NetPeer.SendMessage() to send to multiple recipients efficiently");
-		if (msg.LengthBytes > m_configuration.MaximumTransmissionUnit)
-			throw new NetException("Unconnected messages too long! Must be shorter than NetConfiguration.MaximumTransmissionUnit (currently " + m_configuration.MaximumTransmissionUnit + ")");
+		if (msg.LengthBytes > PeerConfiguration.MaximumTransmissionUnit)
+			throw new NetException("Unconnected messages too long! Must be shorter than NetConfiguration.MaximumTransmissionUnit (currently " + PeerConfiguration.MaximumTransmissionUnit + ")");
 
-		msg.m_messageType = NetMessageType.Unconnected;
-		msg.m_isSent = true;
+		msg.MessageType = NetMessageType.Unconnected;
+		msg.IsSent = true;
 
-		Interlocked.Increment(ref msg.m_recyclingCount);
-		m_unsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(recipient, msg));
+		Interlocked.Increment(ref msg.RecyclingCount);
+		UnsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(recipient, msg));
 	}
 
 	/// <summary>
@@ -198,23 +189,21 @@ public partial class NetPeer
 	/// </summary>
 	public void SendUnconnectedMessage(NetOutgoingMessage msg, IList<NetEndPoint> recipients)
 	{
-		if (msg == null)
-			throw new ArgumentNullException("msg");
-		if (recipients == null)
-			throw new ArgumentNullException("recipients");
-		if (recipients.Count < 1)
+        ArgumentNullException.ThrowIfNull(msg);
+        ArgumentNullException.ThrowIfNull(recipients);
+        if (recipients.Count < 1)
 			throw new NetException("recipients must contain at least one item");
-		if (msg.m_isSent)
+		if (msg.IsSent)
 			throw new NetException("This message has already been sent! Use NetPeer.SendMessage() to send to multiple recipients efficiently");
-		if (msg.LengthBytes > m_configuration.MaximumTransmissionUnit)
-			throw new NetException("Unconnected messages too long! Must be shorter than NetConfiguration.MaximumTransmissionUnit (currently " + m_configuration.MaximumTransmissionUnit + ")");
+		if (msg.LengthBytes > PeerConfiguration.MaximumTransmissionUnit)
+			throw new NetException("Unconnected messages too long! Must be shorter than NetConfiguration.MaximumTransmissionUnit (currently " + PeerConfiguration.MaximumTransmissionUnit + ")");
 
-		msg.m_messageType = NetMessageType.Unconnected;
-		msg.m_isSent = true;
+		msg.MessageType = NetMessageType.Unconnected;
+		msg.IsSent = true;
 
-		Interlocked.Add(ref msg.m_recyclingCount, recipients.Count);
+		Interlocked.Add(ref msg.RecyclingCount, recipients.Count);
 		foreach (var ep in recipients)
-			m_unsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(ep, msg));
+			UnsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(ep, msg));
 	}
 
 	/// <summary>
@@ -222,28 +211,27 @@ public partial class NetPeer
 	/// </summary>
 	public void SendUnconnectedToSelf(NetOutgoingMessage om)
 	{
-		if (om == null)
-			throw new ArgumentNullException("msg");
-		if (om.m_isSent)
+        ArgumentNullException.ThrowIfNull(om);
+        if (om.IsSent)
 			throw new NetException("This message has already been sent! Use NetPeer.SendMessage() to send to multiple recipients efficiently");
 
-		om.m_messageType = NetMessageType.Unconnected;
-		om.m_isSent = true;
+		om.MessageType = NetMessageType.Unconnected;
+		om.IsSent = true;
 
-		if (m_configuration.IsMessageTypeEnabled(NetIncomingMessageType.UnconnectedData) == false)
+		if (PeerConfiguration.IsMessageTypeEnabled(NetIncomingMessageType.UnconnectedData) == false)
 		{
-			Interlocked.Decrement(ref om.m_recyclingCount);
+			Interlocked.Decrement(ref om.RecyclingCount);
 			return; // dropping unconnected message since it's not enabled for receiving
 		}
 
 		// convert outgoing to incoming
 		var im = CreateIncomingMessage(NetIncomingMessageType.UnconnectedData, om.LengthBytes);
 		im.Write(om);
-		im.m_isFragment = false;
-		im.m_receiveTime = NetTime.Now;
-		im.m_senderConnection = null;
-		im.m_senderEndPoint = m_socket.LocalEndPoint as NetEndPoint;
-		NetException.Assert(im.m_bitLength == om.LengthBits);
+		im.IsFragment = false;
+		im.ReceiveTime = NetTime.Now;
+		im.SenderConnection = null;
+		im.SenderEndPoint = Socket.LocalEndPoint as NetEndPoint;
+		NetException.Assert(im.BitLength == om.LengthBits);
 
 		// recycle outgoing message
 		Recycle(om);

@@ -3,21 +3,21 @@
 internal sealed class NetReliableUnorderedReceiver(NetConnection connection, int windowSize)
 	: NetReceiverChannelBase(connection)
 {
-	private int m_windowStart;
-	private NetBitVector m_earlyReceived = new(windowSize);
+	private int _windowStart;
+	private readonly NetBitVector _earlyReceived = new(windowSize);
 
 	private void AdvanceWindow()
 	{
-		m_earlyReceived.Set(m_windowStart % windowSize, false);
-		m_windowStart = (m_windowStart + 1) % NetConstants.NumSequenceNumbers;
+		_earlyReceived.Set(_windowStart % windowSize, false);
+		_windowStart = (_windowStart + 1) % NetConstants.NumSequenceNumbers;
 	}
 
 	internal override void ReceiveMessage(NetIncomingMessage message)
 	{
-		var relate = NetUtility.RelativeSequenceNumber(message.m_sequenceNumber, m_windowStart);
+		var relate = NetUtility.RelativeSequenceNumber(message.SequenceNumber, _windowStart);
 
 		// ack no matter what
-		m_connection.QueueAck(message.m_receivedMessageType, message.m_sequenceNumber);
+		Connection.QueueAck(message.ReceivedMessageType, message.SequenceNumber);
 
 		if (relate == 0)
 		{
@@ -29,12 +29,12 @@ internal sealed class NetReliableUnorderedReceiver(NetConnection connection, int
 			//m_peer.LogVerbose("Received RIGHT-ON-TIME " + message);
 
 			AdvanceWindow();
-			m_peer.ReleaseMessage(message);
+			Peer.ReleaseMessage(message);
 
 			// release withheld messages
-			var nextSeqNr = (message.m_sequenceNumber + 1) % NetConstants.NumSequenceNumbers;
+			var nextSeqNr = (message.SequenceNumber + 1) % NetConstants.NumSequenceNumbers;
 
-			while (m_earlyReceived[nextSeqNr % windowSize])
+			while (_earlyReceived[nextSeqNr % windowSize])
 			{
 				//message = m_withheldMessages[nextSeqNr % m_windowSize];
 				//NetException.Assert(message != null);
@@ -56,8 +56,8 @@ internal sealed class NetReliableUnorderedReceiver(NetConnection connection, int
 		if (relate < 0)
 		{
 			// duplicate
-			m_connection.m_statistics.MessageDropped();
-			m_peer.LogVerbose("Received message #" + message.m_sequenceNumber + " DROPPING DUPLICATE");
+			Connection.ConnectionStatistics.MessageDropped();
+			Peer.LogVerbose("Received message #" + message.SequenceNumber + " DROPPING DUPLICATE");
 			return;
 		}
 
@@ -65,23 +65,23 @@ internal sealed class NetReliableUnorderedReceiver(NetConnection connection, int
 		if (relate > windowSize)
 		{
 			// too early message!
-			m_connection.m_statistics.MessageDropped();
-			m_peer.LogDebug("Received " + message + " TOO EARLY! Expected " + m_windowStart);
+			Connection.ConnectionStatistics.MessageDropped();
+			Peer.LogDebug("Received " + message + " TOO EARLY! Expected " + _windowStart);
 			return;
 		}
 
-		if (m_earlyReceived.Get(message.m_sequenceNumber % windowSize))
+		if (_earlyReceived.Get(message.SequenceNumber % windowSize))
 		{
 			// duplicate
-			m_connection.m_statistics.MessageDropped();
-			m_peer.LogVerbose("Received message #" + message.m_sequenceNumber + " DROPPING DUPLICATE");
+			Connection.ConnectionStatistics.MessageDropped();
+			Peer.LogVerbose("Received message #" + message.SequenceNumber + " DROPPING DUPLICATE");
 			return;
 		}
 
-		m_earlyReceived.Set(message.m_sequenceNumber % windowSize, true);
+		_earlyReceived.Set(message.SequenceNumber % windowSize, true);
 		//m_peer.LogVerbose("Received " + message + " WITHHOLDING, waiting for " + m_windowStart);
 		//m_withheldMessages[message.m_sequenceNumber % m_windowSize] = message;
 
-		m_peer.ReleaseMessage(message);
+		Peer.ReleaseMessage(message);
 	}
 }

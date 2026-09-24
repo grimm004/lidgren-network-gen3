@@ -20,27 +20,20 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
  using System;
  using System.Reflection;
 
- namespace Lidgren.Network; 
+ namespace Lidgren.Network;
 
  public partial class NetBuffer
  {
 	 /// <summary>
-	 /// Reads all public and private declared instance fields of the object in alphabetical order using reflection
-	 /// </summary>
-	 public void ReadAllFields(object target)
-	 {
-		 ReadAllFields(target, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-	 }
-
-	 /// <summary>
 	 /// Reads all fields with the specified binding of the object in alphabetical order using reflection
 	 /// </summary>
-	 public void ReadAllFields(object target, BindingFlags flags)
+	 public void ReadAllFields(
+		 object target,
+		 BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
 	 {
-		 if (target == null)
-			 throw new ArgumentNullException("target");
+        ArgumentNullException.ThrowIfNull(target);
 
-		 var tp = target.GetType();
+        var tp = target.GetType();
 
 		 var fields = tp.GetFields(flags);
 		 NetUtility.SortMembersList(fields);
@@ -51,7 +44,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 			 // find read method
 			 MethodInfo readMethod;
-			 if (s_readMethods.TryGetValue(fi.FieldType, out readMethod))
+			 if (ReadMethods.TryGetValue(fi.FieldType, out readMethod))
 			 {
 				 // read value
 				 value = readMethod.Invoke(this, null);
@@ -63,22 +56,15 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 	 }
 
 	 /// <summary>
-	 /// Reads all public and private declared instance fields of the object in alphabetical order using reflection
-	 /// </summary>
-	 public void ReadAllProperties(object target)
-	 {
-		 ReadAllProperties(target, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-	 }
-
-	 /// <summary>
 	 /// Reads all fields with the specified binding of the object in alphabetical order using reflection
 	 /// </summary>
-	 public void ReadAllProperties(object target, BindingFlags flags)
+	 public void ReadAllProperties(
+		 object target,
+		 BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
 	 {
-		 if (target == null)
-			 throw new ArgumentNullException("target");
+        ArgumentNullException.ThrowIfNull(target);
 
-		 var tp = target.GetType();
+        var tp = target.GetType();
 
 		 var fields = tp.GetProperties(flags);
 		 NetUtility.SortMembersList(fields);
@@ -88,7 +74,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 			 // find read method
 			 MethodInfo readMethod;
-			 if (s_readMethods.TryGetValue(fi.PropertyType, out readMethod))
+			 if (ReadMethods.TryGetValue(fi.PropertyType, out readMethod))
 			 {
 				 // read value
 				 value = readMethod.Invoke(this, null);

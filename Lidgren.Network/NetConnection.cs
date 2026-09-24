@@ -10,92 +10,87 @@ namespace Lidgren.Network;
 /// <summary>
 /// Represents a connection to a remote peer
 /// </summary>
-[DebuggerDisplay("RemoteUniqueIdentifier={RemoteUniqueIdentifier} RemoteEndPoint={m_remoteEndPoint}")]
+[DebuggerDisplay("RemoteUniqueIdentifier={RemoteUniqueIdentifier} RemoteEndPoint={RemoteNetEndPoint}")]
 public partial class NetConnection
 {
-	private const int m_infrequentEventsSkipFrames = 8; // number of heartbeats to skip checking for infrequent events (ping, timeout etc)
-	private const int m_messageCoalesceFrames = 3; // number of heartbeats to wait for more incoming messages before sending packet
+	private const int InfrequentEventsSkipFrames = 8; // number of heartbeats to skip checking for infrequent events (ping, timeout etc)
+	private const int MessageCoalesceFrames = 3; // number of heartbeats to wait for more incoming messages before sending packet
 
-	internal NetPeer m_peer;
-	internal NetPeerConfiguration m_peerConfiguration;
-	internal NetConnectionStatus m_status; // actual status
-	internal NetConnectionStatus m_outputtedStatus; // status that has been sent as StatusChanged message
-	internal NetConnectionStatus m_visibleStatus; // status visible by querying the Status property
-	internal NetEndPoint m_remoteEndPoint;
-	internal NetSenderChannelBase[] m_sendChannels;
-	internal NetReceiverChannelBase[] m_receiveChannels;
-	internal NetOutgoingMessage m_localHailMessage;
-	internal long m_remoteUniqueIdentifier;
-	internal NetQueue<NetTuple<NetMessageType, int>> m_queuedOutgoingAcks;
-	internal NetQueue<NetTuple<NetMessageType, int>> m_queuedIncomingAcks;
-	private int m_sendBufferWritePtr;
-	private int m_sendBufferNumMessages;
-	private object m_tag;
-	internal NetConnectionStatistics m_statistics;
+	internal readonly NetPeer NetPeer;
+	internal readonly NetPeerConfiguration PeerConfiguration;
+	internal NetConnectionStatus ConnectionStatus; // actual status
+	private NetConnectionStatus _outputtedStatus; // status that has been sent as StatusChanged message
+	internal NetConnectionStatus VisibleStatus; // status visible by querying the Status property
+	internal NetEndPoint RemoteNetEndPoint;
+	internal readonly NetSenderChannelBase[] SendChannels;
+	internal readonly NetReceiverChannelBase[] ReceiveChannels;
+	internal NetOutgoingMessage LocalOutgoingHailMessage;
+	private long _remoteUniqueIdentifier;
+	private readonly NetQueue<NetTuple<NetMessageType, int>> _queuedOutgoingAcks;
+	private readonly NetQueue<NetTuple<NetMessageType, int>> _queuedIncomingAcks;
+	private int _sendBufferWritePtr;
+	private int _sendBufferNumMessages;
+	internal readonly NetConnectionStatistics ConnectionStatistics;
 
 	/// <summary>
 	/// Gets or sets the application defined object containing data about the connection
 	/// </summary>
-	public object Tag
-	{
-		get { return m_tag; }
-		set { m_tag = value; }
-	}
+	public object Tag { get; set; }
 
 	/// <summary>
 	/// Gets the peer which holds this connection
 	/// </summary>
-	public NetPeer Peer { get { return m_peer; } }
+	public NetPeer Peer => NetPeer;
 
 	/// <summary>
 	/// Gets the current status of the connection (synced to the last status message read)
 	/// </summary>
-	public NetConnectionStatus Status { get { return m_visibleStatus; } }
+	public NetConnectionStatus Status => VisibleStatus;
 
 	/// <summary>
 	/// Gets various statistics for this connection
 	/// </summary>
-	public NetConnectionStatistics Statistics { get { return m_statistics; } }
+	public NetConnectionStatistics Statistics => ConnectionStatistics;
 
 	/// <summary>
 	/// Gets the remote endpoint for the connection
 	/// </summary>
-	public NetEndPoint RemoteEndPoint { get { return m_remoteEndPoint; } }
+	public NetEndPoint RemoteEndPoint => RemoteNetEndPoint;
 
 	/// <summary>
 	/// Gets the unique identifier of the remote NetPeer for this connection
 	/// </summary>
-	public long RemoteUniqueIdentifier { get { return m_remoteUniqueIdentifier; } }
+	public long RemoteUniqueIdentifier => _remoteUniqueIdentifier;
 
 	/// <summary>
 	/// Gets the local hail message that was sent as part of the handshake
 	/// </summary>
-	public NetOutgoingMessage LocalHailMessage { get { return m_localHailMessage; } }
+	public NetOutgoingMessage LocalHailMessage => LocalOutgoingHailMessage;
 
 	// gets the time before automatically resending an unacked message
 	internal double GetResendDelay()
 	{
-		var avgRtt = m_averageRoundtripTime;
+		var avgRtt = _averageRoundtripTime;
 		if (avgRtt <= 0)
 			avgRtt = 0.1; // "default" resend is based on 100 ms roundtrip time
-		return 0.025 + (avgRtt * 2.1); // 25 ms + double rtt
+		return 0.025 + avgRtt * 2.1; // 25 ms + double rtt
 	}
 
 	internal NetConnection(NetPeer peer, NetEndPoint remoteEndPoint)
 	{
-		m_peer = peer;
-		m_peerConfiguration = m_peer.Configuration;
-		m_status = NetConnectionStatus.None;
-		m_outputtedStatus = NetConnectionStatus.None;
-		m_visibleStatus = NetConnectionStatus.None;
-		m_remoteEndPoint = remoteEndPoint;
-		m_sendChannels = new NetSenderChannelBase[NetConstants.NumTotalChannels];
-		m_receiveChannels = new NetReceiverChannelBase[NetConstants.NumTotalChannels];
-		m_queuedOutgoingAcks = new NetQueue<NetTuple<NetMessageType, int>>(4);
-		m_queuedIncomingAcks = new NetQueue<NetTuple<NetMessageType, int>>(4);
-		m_statistics = new NetConnectionStatistics(this);
-		m_averageRoundtripTime = -1.0f;
-		m_currentMTU = m_peerConfiguration.MaximumTransmissionUnit;
+		NetPeer = peer;
+		PeerConfiguration = NetPeer.Configuration;
+		ConnectionStatus = NetConnectionStatus.None;
+		_outputtedStatus = NetConnectionStatus.None;
+		VisibleStatus = NetConnectionStatus.None;
+		RemoteNetEndPoint = remoteEndPoint;
+		SendChannels = new NetSenderChannelBase[NetConstants.NumTotalChannels];
+		ReceiveChannels = new NetReceiverChannelBase[NetConstants.NumTotalChannels];
+		_queuedOutgoingAcks = new NetQueue<NetTuple<NetMessageType, int>>(4);
+		_queuedIncomingAcks = new NetQueue<NetTuple<NetMessageType, int>>(4);
+		ConnectionStatistics = new NetConnectionStatistics(this);
+		_averageRoundtripTime = -1.0f;
+		CurrentMtuValue = PeerConfiguration.MaximumTransmissionUnit;
 	}
 
 	/// <summary>
@@ -103,137 +98,135 @@ public partial class NetConnection
 	/// </summary>
 	internal void MutateEndPoint(NetEndPoint endPoint)
 	{
-		m_remoteEndPoint = endPoint;
+		RemoteNetEndPoint = endPoint;
 	}
 
 	internal void ResetTimeout(double now)
 	{
-		m_timeoutDeadline = now + m_peerConfiguration.m_connectionTimeout;
+		_timeoutDeadline = now + PeerConfiguration.ConnectionTimeout;
 	}
 
 	internal void SetStatus(NetConnectionStatus status, string reason)
 	{
 		// user or library thread
 
-		m_status = status;
+		ConnectionStatus = status;
 		if (reason == null)
 			reason = string.Empty;
 
-		if (m_status == NetConnectionStatus.Connected)
+		if (ConnectionStatus == NetConnectionStatus.Connected)
 		{
-			m_timeoutDeadline = NetTime.Now + m_peerConfiguration.m_connectionTimeout;
-			m_peer.LogVerbose("Timeout deadline initialized to  " + m_timeoutDeadline);
+			_timeoutDeadline = NetTime.Now + PeerConfiguration.ConnectionTimeout;
+			NetPeer.LogVerbose("Timeout deadline initialized to  " + _timeoutDeadline);
 		}
 
-		if (m_peerConfiguration.IsMessageTypeEnabled(NetIncomingMessageType.StatusChanged))
+		if (PeerConfiguration.IsMessageTypeEnabled(NetIncomingMessageType.StatusChanged))
 		{
-			if (m_outputtedStatus != status)
+			if (_outputtedStatus != status)
 			{
-				var info = m_peer.CreateIncomingMessage(NetIncomingMessageType.StatusChanged, 4 + reason.Length + (reason.Length > 126 ? 2 : 1));
-				info.m_senderConnection = this;
-				info.m_senderEndPoint = m_remoteEndPoint;
-				info.Write((byte)m_status);
+				var info = NetPeer.CreateIncomingMessage(NetIncomingMessageType.StatusChanged, 4 + reason.Length + (reason.Length > 126 ? 2 : 1));
+				info.SenderConnection = this;
+				info.SenderEndPoint = RemoteNetEndPoint;
+				info.Write((byte)ConnectionStatus);
 				info.Write(reason);
-				m_peer.ReleaseMessage(info);
-				m_outputtedStatus = status;
+				NetPeer.ReleaseMessage(info);
+				_outputtedStatus = status;
 			}
 		}
 		else
 		{
 			// app dont want those messages, update visible status immediately
-			m_outputtedStatus = m_status;
-			m_visibleStatus = m_status;
+			_outputtedStatus = ConnectionStatus;
+			VisibleStatus = ConnectionStatus;
 		}
 	}
 
 	internal void Heartbeat(double now, uint frameCounter)
 	{
-		m_peer.VerifyNetworkThread();
+		NetPeer.VerifyNetworkThread();
 
-		NetException.Assert(m_status != NetConnectionStatus.InitiatedConnect && m_status != NetConnectionStatus.RespondedConnect);
+		NetException.Assert(ConnectionStatus != NetConnectionStatus.InitiatedConnect && ConnectionStatus != NetConnectionStatus.RespondedConnect);
 
-		if ((frameCounter % m_infrequentEventsSkipFrames) == 0)
+		if (frameCounter % InfrequentEventsSkipFrames == 0)
 		{
-			if (now > m_timeoutDeadline)
+			if (now > _timeoutDeadline)
 			{
 				//
 				// connection timed out
 				//
-				m_peer.LogVerbose("Connection timed out at " + now + " deadline was " + m_timeoutDeadline);
+				NetPeer.LogVerbose("Connection timed out at " + now + " deadline was " + _timeoutDeadline);
 				ExecuteDisconnect("Connection timed out", true);
 				return;
 			}
 
 			// send ping?
-			if (m_status == NetConnectionStatus.Connected)
+			if (ConnectionStatus == NetConnectionStatus.Connected)
 			{
-				if (now > m_sentPingTime + m_peer.m_configuration.m_pingInterval)
+				if (now > _sentPingTime + NetPeer.PeerConfiguration.PingInterval)
 					SendPing();
 
 				// handle expand mtu
-				MTUExpansionHeartbeat(now);
+				MtuExpansionHeartbeat(now);
 			}
 
-			if (m_disconnectRequested)
+			if (_disconnectRequested)
 			{
-				ExecuteDisconnect(m_disconnectMessage, m_disconnectReqSendBye);
+				ExecuteDisconnect(_disconnectMessage, _disconnectReqSendBye);
 				return;
 			}
 		}
-
-		bool connectionReset; // TODO: handle connection reset
 
 		//
 		// Note: at this point m_sendBufferWritePtr and m_sendBufferNumMessages may be non-null; resends may already be queued up
 		//
 
-		var sendBuffer = m_peer.m_sendBuffer;
-		var mtu = m_currentMTU;
+		var sendBuffer = NetPeer.SendBuffer;
+		var mtu = CurrentMtuValue;
 
-		if ((frameCounter % m_messageCoalesceFrames) == 0) // coalesce a few frames
+		if (frameCounter % MessageCoalesceFrames == 0) // coalesce a few frames
 		{
 			//
 			// send ack messages
 			//
-			while (m_queuedOutgoingAcks.Count > 0)
+			while (_queuedOutgoingAcks.Count > 0)
 			{
-				var acks = (mtu - (m_sendBufferWritePtr + 5)) / 3; // 3 bytes per actual ack
-				if (acks > m_queuedOutgoingAcks.Count)
-					acks = m_queuedOutgoingAcks.Count;
+				var acks = (mtu - (_sendBufferWritePtr + 5)) / 3; // 3 bytes per actual ack
+				if (acks > _queuedOutgoingAcks.Count)
+					acks = _queuedOutgoingAcks.Count;
 
 				NetException.Assert(acks > 0);
 
-				m_sendBufferNumMessages++;
+				_sendBufferNumMessages++;
 
 				// write acks header
-				sendBuffer[m_sendBufferWritePtr++] = (byte)NetMessageType.Acknowledge;
-				sendBuffer[m_sendBufferWritePtr++] = 0; // no sequence number
-				sendBuffer[m_sendBufferWritePtr++] = 0; // no sequence number
-				var len = (acks * 3) * 8; // bits
-				sendBuffer[m_sendBufferWritePtr++] = (byte)len;
-				sendBuffer[m_sendBufferWritePtr++] = (byte)(len >> 8);
+				sendBuffer[_sendBufferWritePtr++] = (byte)NetMessageType.Acknowledge;
+				sendBuffer[_sendBufferWritePtr++] = 0; // no sequence number
+				sendBuffer[_sendBufferWritePtr++] = 0; // no sequence number
+				var len = acks * 3 * 8; // bits
+				sendBuffer[_sendBufferWritePtr++] = (byte)len;
+				sendBuffer[_sendBufferWritePtr++] = (byte)(len >> 8);
 
 				// write acks
 				for (var i = 0; i < acks; i++)
 				{
 					NetTuple<NetMessageType, int> tuple;
-					m_queuedOutgoingAcks.TryDequeue(out tuple);
+					_queuedOutgoingAcks.TryDequeue(out tuple);
 
 					//m_peer.LogVerbose("Sending ack for " + tuple.Item1 + "#" + tuple.Item2);
 
-					sendBuffer[m_sendBufferWritePtr++] = (byte)tuple.Item1;
-					sendBuffer[m_sendBufferWritePtr++] = (byte)tuple.Item2;
-					sendBuffer[m_sendBufferWritePtr++] = (byte)(tuple.Item2 >> 8);
+					sendBuffer[_sendBufferWritePtr++] = (byte)tuple.Item1;
+					sendBuffer[_sendBufferWritePtr++] = (byte)tuple.Item2;
+					sendBuffer[_sendBufferWritePtr++] = (byte)(tuple.Item2 >> 8);
 				}
 
-				if (m_queuedOutgoingAcks.Count > 0)
+				if (_queuedOutgoingAcks.Count > 0)
 				{
 					// send packet and go for another round of acks
-					NetException.Assert(m_sendBufferWritePtr > 0 && m_sendBufferNumMessages > 0);
-					m_peer.SendPacket(m_sendBufferWritePtr, m_remoteEndPoint, m_sendBufferNumMessages, out connectionReset);
-					m_statistics.PacketSent(m_sendBufferWritePtr, 1);
-					m_sendBufferWritePtr = 0;
-					m_sendBufferNumMessages = 0;
+					NetException.Assert(_sendBufferWritePtr > 0 && _sendBufferNumMessages > 0);
+					NetPeer.SendPacket(_sendBufferWritePtr, RemoteNetEndPoint, _sendBufferNumMessages, out _);
+					ConnectionStatistics.PacketSent(_sendBufferWritePtr, 1);
+					_sendBufferWritePtr = 0;
+					_sendBufferNumMessages = 0;
 				}
 			}
 
@@ -241,10 +234,10 @@ public partial class NetConnection
 			// Parse incoming acks (may trigger resends)
 			//
 			NetTuple<NetMessageType, int> incAck;
-			while (m_queuedIncomingAcks.TryDequeue(out incAck))
+			while (_queuedIncomingAcks.TryDequeue(out incAck))
 			{
 				//m_peer.LogVerbose("Received ack for " + acktp + "#" + seqNr);
-				var chan = m_sendChannels[(int)incAck.Item1 - 1];
+				var chan = SendChannels[(int)incAck.Item1 - 1];
 
 				// If we haven't sent a message on this channel there is no reason to ack it
 				if (chan == null)
@@ -257,78 +250,76 @@ public partial class NetConnection
 		//
 		// send queued messages
 		//
-		if (m_peer.m_executeFlushSendQueue)
+		if (NetPeer.ExecuteFlushSendQueue)
 		{
-			for (var i = m_sendChannels.Length - 1; i >= 0; i--)    // Reverse order so reliable messages are sent first
+			for (var i = SendChannels.Length - 1; i >= 0; i--)    // Reverse order so reliable messages are sent first
 			{
-				var channel = m_sendChannels[i];
-				NetException.Assert(m_sendBufferWritePtr < 1 || m_sendBufferNumMessages > 0);
+				var channel = SendChannels[i];
+				NetException.Assert(_sendBufferWritePtr < 1 || _sendBufferNumMessages > 0);
 				if (channel != null)
 				{
 					channel.SendQueuedMessages(now);
 					if (channel.NeedToSendMessages())
-						m_peer.m_needFlushSendQueue = true; // failed to send all queued sends; likely a full window - need to try again
+						NetPeer.NeedFlushSendQueue = true; // failed to send all queued sends; likely a full window - need to try again
 				}
-				NetException.Assert(m_sendBufferWritePtr < 1 || m_sendBufferNumMessages > 0);
+				NetException.Assert(_sendBufferWritePtr < 1 || _sendBufferNumMessages > 0);
 			}
 		}
 
 		//
 		// Put on wire data has been written to send buffer but not yet sent
 		//
-		if (m_sendBufferWritePtr > 0)
+		if (_sendBufferWritePtr > 0)
 		{
-			m_peer.VerifyNetworkThread();
-			NetException.Assert(m_sendBufferWritePtr > 0 && m_sendBufferNumMessages > 0);
-			m_peer.SendPacket(m_sendBufferWritePtr, m_remoteEndPoint, m_sendBufferNumMessages, out connectionReset);
-			m_statistics.PacketSent(m_sendBufferWritePtr, m_sendBufferNumMessages);
-			m_sendBufferWritePtr = 0;
-			m_sendBufferNumMessages = 0;
+			NetPeer.VerifyNetworkThread();
+			NetException.Assert(_sendBufferWritePtr > 0 && _sendBufferNumMessages > 0);
+			NetPeer.SendPacket(_sendBufferWritePtr, RemoteNetEndPoint, _sendBufferNumMessages, out _);
+			ConnectionStatistics.PacketSent(_sendBufferWritePtr, _sendBufferNumMessages);
+			_sendBufferWritePtr = 0;
+			_sendBufferNumMessages = 0;
 		}
 	}
-		
+
 	// Queue an item for immediate sending on the wire
 	// This method is called from the ISenderChannels
 	internal void QueueSendMessage(NetOutgoingMessage om, int seqNr)
 	{
-		m_peer.VerifyNetworkThread();
+		NetPeer.VerifyNetworkThread();
 
 		var sz = om.GetEncodedSize();
 		//if (sz > m_currentMTU)
 		//	m_peer.LogWarning("Message larger than MTU! Fragmentation must have failed!");
 
-		bool connReset; // TODO: handle connection reset
-
 		// can fit this message together with previously written to buffer?
-		if (m_sendBufferWritePtr + sz > m_currentMTU)
+		if (_sendBufferWritePtr + sz > CurrentMtuValue)
 		{
-			if (m_sendBufferWritePtr > 0 && m_sendBufferNumMessages > 0)
+			if (_sendBufferWritePtr > 0 && _sendBufferNumMessages > 0)
 			{
 				// previous message in buffer; send these first
-				m_peer.SendPacket(m_sendBufferWritePtr, m_remoteEndPoint, m_sendBufferNumMessages, out connReset);
-				m_statistics.PacketSent(m_sendBufferWritePtr, m_sendBufferNumMessages);
-				m_sendBufferWritePtr = 0;
-				m_sendBufferNumMessages = 0;
+				NetPeer.SendPacket(_sendBufferWritePtr, RemoteNetEndPoint, _sendBufferNumMessages, out _);
+				ConnectionStatistics.PacketSent(_sendBufferWritePtr, _sendBufferNumMessages);
+				_sendBufferWritePtr = 0;
+				_sendBufferNumMessages = 0;
 			}
 		}
 
 		// encode it into buffer regardless if it (now) fits within MTU or not
-		m_sendBufferWritePtr = om.Encode(m_peer.m_sendBuffer, m_sendBufferWritePtr, seqNr);
-		m_sendBufferNumMessages++;
+		_sendBufferWritePtr = om.Encode(NetPeer.SendBuffer, _sendBufferWritePtr, seqNr);
+		_sendBufferNumMessages++;
 
-		if (m_sendBufferWritePtr > m_currentMTU)
+		if (_sendBufferWritePtr > CurrentMtuValue)
 		{
 			// send immediately; we're already over MTU
-			m_peer.SendPacket(m_sendBufferWritePtr, m_remoteEndPoint, m_sendBufferNumMessages, out connReset);
-			m_statistics.PacketSent(m_sendBufferWritePtr, m_sendBufferNumMessages);
-			m_sendBufferWritePtr = 0;
-			m_sendBufferNumMessages = 0;
+			NetPeer.SendPacket(_sendBufferWritePtr, RemoteNetEndPoint, _sendBufferNumMessages, out _);
+			ConnectionStatistics.PacketSent(_sendBufferWritePtr, _sendBufferNumMessages);
+			_sendBufferWritePtr = 0;
+			_sendBufferNumMessages = 0;
 		}
 
-		if (m_sendBufferWritePtr > 0)
-			m_peer.m_needFlushSendQueue = true; // flush in heartbeat
+		if (_sendBufferWritePtr > 0)
+			NetPeer.NeedFlushSendQueue = true; // flush in heartbeat
 
-		Interlocked.Decrement(ref om.m_recyclingCount);
+		Interlocked.Decrement(ref om.RecyclingCount);
 	}
 
 	/// <summary>
@@ -339,26 +330,26 @@ public partial class NetConnection
 	/// <param name="sequenceChannel">Sequence channel within the delivery method</param>
 	public NetSendResult SendMessage(NetOutgoingMessage msg, NetDeliveryMethod method, int sequenceChannel)
 	{
-		return m_peer.SendMessage(msg, this, method, sequenceChannel);
+		return NetPeer.SendMessage(msg, this, method, sequenceChannel);
 	}
 
 	// called by SendMessage() and NetPeer.SendMessage; ie. may be user thread
 	internal NetSendResult EnqueueMessage(NetOutgoingMessage msg, NetDeliveryMethod method, int sequenceChannel)
 	{
-		if (m_status != NetConnectionStatus.Connected)
+		if (ConnectionStatus != NetConnectionStatus.Connected)
 			return NetSendResult.FailedNotConnected;
 
 		var tp = (NetMessageType)((int)method + sequenceChannel);
-		msg.m_messageType = tp;
+		msg.MessageType = tp;
 
 		// TODO: do we need to make this more thread safe?
 		var channelSlot = (int)method - 1 + sequenceChannel;
-		var chan = m_sendChannels[channelSlot];
+		var chan = SendChannels[channelSlot];
 		if (chan == null)
 			chan = CreateSenderChannel(tp);
 
-		if ((method != NetDeliveryMethod.Unreliable && method != NetDeliveryMethod.UnreliableSequenced) && msg.GetEncodedSize() > m_currentMTU)
-			m_peer.ThrowOrLog("Reliable message too large! Fragmentation failure?");
+		if (method != NetDeliveryMethod.Unreliable && method != NetDeliveryMethod.UnreliableSequenced && msg.GetEncodedSize() > CurrentMtuValue)
+			NetPeer.ThrowOrLog("Reliable message too large! Fragmentation failure?");
 
 		var retval = chan.Enqueue(msg);
 		//if (retval == NetSendResult.Sent && m_peerConfiguration.m_autoFlushSendQueue == false)
@@ -370,16 +361,16 @@ public partial class NetConnection
 	private NetSenderChannelBase CreateSenderChannel(NetMessageType tp)
 	{
 		NetSenderChannelBase chan;
-		lock (m_sendChannels)
+		lock (SendChannels)
 		{
 			var method = NetUtility.GetDeliveryMethod(tp);
 			var sequenceChannel = (int)tp - (int)method;
 
 			var channelSlot = (int)method - 1 + sequenceChannel;
-			if (m_sendChannels[channelSlot] != null)
+			if (SendChannels[channelSlot] != null)
 			{
 				// we were pre-empted by another call to this method
-				chan = m_sendChannels[channelSlot];
+				chan = SendChannels[channelSlot];
 			}
 			else
 			{
@@ -398,7 +389,7 @@ public partial class NetConnection
 						chan = new NetReliableSenderChannel(this, NetUtility.GetWindowSize(method));
 						break;
 				}
-				m_sendChannels[channelSlot] = chan;
+				SendChannels[channelSlot] = chan;
 			}
 		}
 
@@ -408,19 +399,19 @@ public partial class NetConnection
 	// received a library message while Connected
 	internal void ReceivedLibraryMessage(NetMessageType tp, int ptr, int payloadLength)
 	{
-		m_peer.VerifyNetworkThread();
+		NetPeer.VerifyNetworkThread();
 
 		var now = NetTime.Now;
 
 		switch (tp)
 		{
 			case NetMessageType.Connect:
-				m_peer.LogDebug("Received handshake message (" + tp + ") despite connection being in place");
+				NetPeer.LogDebug("Received handshake message (" + tp + ") despite connection being in place");
 				break;
 
 			case NetMessageType.ConnectResponse:
 				// handshake message must have been lost
-				HandleConnectResponse(now, tp, ptr, payloadLength);
+				HandleConnectResponse(ptr, payloadLength);
 				break;
 
 			case NetMessageType.ConnectionEstablished:
@@ -428,69 +419,69 @@ public partial class NetConnection
 				break;
 
 			case NetMessageType.LibraryError:
-				m_peer.ThrowOrLog("LibraryError received by ReceivedLibraryMessage; this usually indicates a malformed message");
+				NetPeer.ThrowOrLog("LibraryError received by ReceivedLibraryMessage; this usually indicates a malformed message");
 				break;
 
 			case NetMessageType.Disconnect:
-				var msg = m_peer.SetupReadHelperMessage(ptr, payloadLength);
+				var msg = NetPeer.SetupReadHelperMessage(ptr, payloadLength);
 
-				m_disconnectRequested = true;
-				m_disconnectMessage = msg.ReadString();
-				m_disconnectReqSendBye = false;
+				_disconnectRequested = true;
+				_disconnectMessage = msg.ReadString();
+				_disconnectReqSendBye = false;
 				//ExecuteDisconnect(msg.ReadString(), false);
 				break;
 			case NetMessageType.Acknowledge:
 				for (var i = 0; i < payloadLength; i+=3)
 				{
-					var acktp = (NetMessageType)m_peer.m_receiveBuffer[ptr++]; // netmessagetype
-					int seqNr = m_peer.m_receiveBuffer[ptr++];
-					seqNr |= (m_peer.m_receiveBuffer[ptr++] << 8);
+					var acktp = (NetMessageType)NetPeer.ReceiveBuffer[ptr++]; // netmessagetype
+					int seqNr = NetPeer.ReceiveBuffer[ptr++];
+					seqNr |= NetPeer.ReceiveBuffer[ptr++] << 8;
 
 					// need to enqueue this and handle it in the netconnection heartbeat; so be able to send resends together with normal sends
-					m_queuedIncomingAcks.Enqueue(new NetTuple<NetMessageType, int>(acktp, seqNr));
+					_queuedIncomingAcks.Enqueue(new NetTuple<NetMessageType, int>(acktp, seqNr));
 				}
 				break;
 			case NetMessageType.Ping:
-				int pingNr = m_peer.m_receiveBuffer[ptr++];
+				int pingNr = NetPeer.ReceiveBuffer[ptr];
 				SendPong(pingNr);
 				break;
 			case NetMessageType.Pong:
-				var pmsg = m_peer.SetupReadHelperMessage(ptr, payloadLength);
+				var pmsg = NetPeer.SetupReadHelperMessage(ptr, payloadLength);
 				int pongNr = pmsg.ReadByte();
 				var remoteSendTime = pmsg.ReadSingle();
 				ReceivedPong(now, pongNr, remoteSendTime);
 				break;
-			case NetMessageType.ExpandMTURequest:
-				SendMTUSuccess(payloadLength);
+			case NetMessageType.ExpandMtuRequest:
+				SendMtuSuccess(payloadLength);
 				break;
-			case NetMessageType.ExpandMTUSuccess:
-				if (m_peer.Configuration.AutoExpandMTU == false)
+			case NetMessageType.ExpandMtuSuccess:
+				if (NetPeer.Configuration.AutoExpandMtu == false)
 				{
-					m_peer.LogDebug("Received ExpandMTURequest altho AutoExpandMTU is turned off!");
+					NetPeer.LogDebug("Received ExpandMTURequest altho AutoExpandMTU is turned off!");
 					break;
 				}
-				var emsg = m_peer.SetupReadHelperMessage(ptr, payloadLength);
+				var emsg = NetPeer.SetupReadHelperMessage(ptr, payloadLength);
 				var size = emsg.ReadInt32();
-				HandleExpandMTUSuccess(now, size);
+				HandleExpandMtuSuccess(now, size);
 				break;
 			case NetMessageType.NatIntroduction:
 				// Unusual situation where server is actually already known, but got a nat introduction - oh well, lets handle it as usual
-				m_peer.HandleNatIntroduction(ptr);
+				NetPeer.HandleNatIntroduction(ptr);
 				break;
 			default:
-				m_peer.LogWarning("Connection received unhandled library message: " + tp);
+				NetPeer.LogWarning("Connection received unhandled library message: " + tp);
 				break;
 		}
 	}
 
 	internal void ReceivedMessage(NetIncomingMessage msg)
 	{
-		m_peer.VerifyNetworkThread();
+		NetPeer.VerifyNetworkThread();
 
-		var tp = msg.m_receivedMessageType;
+		var tp = msg.ReceivedMessageType;
 
 		var channelSlot = (int)tp - 1;
-		var chan = m_receiveChannels[channelSlot];
+		var chan = ReceiveChannels[channelSlot];
 		if (chan == null)
 			chan = CreateReceiverChannel(tp);
 
@@ -499,7 +490,7 @@ public partial class NetConnection
 
 	private NetReceiverChannelBase CreateReceiverChannel(NetMessageType tp)
 	{
-		m_peer.VerifyNetworkThread();
+		NetPeer.VerifyNetworkThread();
 
 		// create receiver channel
 		NetReceiverChannelBase chan;
@@ -526,15 +517,15 @@ public partial class NetConnection
 		}
 
 		var channelSlot = (int)tp - 1;
-		NetException.Assert(m_receiveChannels[channelSlot] == null);
-		m_receiveChannels[channelSlot] = chan;
+		NetException.Assert(ReceiveChannels[channelSlot] == null);
+		ReceiveChannels[channelSlot] = chan;
 
 		return chan;
 	}
 
 	internal void QueueAck(NetMessageType tp, int sequenceNumber)
 	{
-		m_queuedOutgoingAcks.Enqueue(new NetTuple<NetMessageType, int>(tp, sequenceNumber));
+		_queuedOutgoingAcks.Enqueue(new NetTuple<NetMessageType, int>(tp, sequenceNumber));
 	}
 
 	/// <summary>
@@ -544,7 +535,7 @@ public partial class NetConnection
 	public void GetSendQueueInfo(NetDeliveryMethod method, int sequenceChannel, out int windowSize, out int freeWindowSlots)
 	{
 		var channelSlot = (int)method - 1 + sequenceChannel;
-		var chan = m_sendChannels[channelSlot];
+		var chan = SendChannels[channelSlot];
 		if (chan == null)
 		{
 			windowSize = NetUtility.GetWindowSize(method);
@@ -554,13 +545,12 @@ public partial class NetConnection
 
 		windowSize = chan.WindowSize;
 		freeWindowSlots = chan.GetFreeWindowSlots();
-		return;
 	}
 
 	public bool CanSendImmediately(NetDeliveryMethod method, int sequenceChannel)
 	{
 		var channelSlot = (int)method - 1 + sequenceChannel;
-		var chan = m_sendChannels[channelSlot];
+		var chan = SendChannels[channelSlot];
 		if (chan == null)
 			return true;
 		return chan.GetFreeWindowSlots() > 0;
@@ -576,6 +566,6 @@ public partial class NetConnection
 	/// </summary>
 	public override string ToString()
 	{
-		return "[NetConnection to " + m_remoteEndPoint + "]";
+		return "[NetConnection to " + RemoteNetEndPoint + "]";
 	}
 }

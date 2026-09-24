@@ -31,7 +31,6 @@ public sealed class NetException : Exception
 	/// NetException constructor
 	/// </summary>
 	public NetException()
-		: base()
 	{
 	}
 

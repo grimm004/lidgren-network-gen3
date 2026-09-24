@@ -1,33 +1,33 @@
 ﻿using System.IO;
 using System.Security.Cryptography;
 
-namespace Lidgren.Network;
+namespace Lidgren.Network.Encryption;
 
 public abstract class NetCryptoProviderBase : NetEncryption
 {
-	protected SymmetricAlgorithm m_algorithm;
+	private readonly SymmetricAlgorithm _algorithm;
 
 	public NetCryptoProviderBase(NetPeer peer, SymmetricAlgorithm algo)
 		: base(peer)
 	{
-		m_algorithm = algo;
-		m_algorithm.GenerateKey();
-		m_algorithm.GenerateIV();
+		_algorithm = algo;
+		_algorithm.GenerateKey();
+		_algorithm.GenerateIV();
 	}
 
-	public override void SetKey(byte[] data, int offset, int count)
+	protected override void SetKey(byte[] data, int offset, int count)
 	{
-		var len = m_algorithm.Key.Length;
+		var len = _algorithm.Key.Length;
 		var key = new byte[len];
 		for (var i = 0; i < len; i++)
-			key[i] = data[offset + (i % count)];
-		m_algorithm.Key = key;
+			key[i] = data[offset + i % count];
+		_algorithm.Key = key;
 
-		len = m_algorithm.IV.Length;
+		len = _algorithm.IV.Length;
 		key = new byte[len];
 		for (var i = 0; i < len; i++)
-			key[len - 1 - i] = data[offset + (i % count)];
-		m_algorithm.IV = key;
+			key[len - 1 - i] = data[offset + i % count];
+		_algorithm.IV = key;
 	}
 
 	public override bool Encrypt(NetOutgoingMessage msg)
@@ -35,8 +35,8 @@ public abstract class NetCryptoProviderBase : NetEncryption
 		var unEncLenBits = msg.LengthBits;
 
 		var ms = new MemoryStream();
-		var cs = new CryptoStream(ms, m_algorithm.CreateEncryptor(), CryptoStreamMode.Write);
-		cs.Write(msg.m_data, 0, msg.LengthBytes);
+		var cs = new CryptoStream(ms, _algorithm.CreateEncryptor(), CryptoStreamMode.Write);
+		cs.Write(msg.DataBuffer, 0, msg.LengthBytes);
 		cs.Close();
 
 		// get results
@@ -56,19 +56,19 @@ public abstract class NetCryptoProviderBase : NetEncryption
 	{
 		var unEncLenBits = (int)msg.ReadUInt32();
 
-		var ms = new MemoryStream(msg.m_data, 4, msg.LengthBytes - 4);
-		var cs = new CryptoStream(ms, m_algorithm.CreateDecryptor(), CryptoStreamMode.Read);
+		var ms = new MemoryStream(msg.DataBuffer, 4, msg.LengthBytes - 4);
+		var cs = new CryptoStream(ms, _algorithm.CreateDecryptor(), CryptoStreamMode.Read);
 
 		var byteLen = NetUtility.BytesToHoldBits(unEncLenBits);
-		var result = m_peer.GetStorage(byteLen);
+		var result = Peer.GetStorage(byteLen);
 		cs.ReadExactly(result, 0, byteLen);
 		cs.Close();
 
 		// TODO: recycle existing msg
 
-		msg.m_data = result;
-		msg.m_bitLength = unEncLenBits;
-		msg.m_readPosition = 0;
+		msg.DataBuffer = result;
+		msg.BitLength = unEncLenBits;
+		msg.ReadPosition = 0;
 
 		return true;
 	}

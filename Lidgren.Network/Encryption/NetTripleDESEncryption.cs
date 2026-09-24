@@ -1,21 +1,21 @@
 using System.Security.Cryptography;
 
-namespace Lidgren.Network;
+namespace Lidgren.Network.Encryption;
 
-public class NetTripleDESEncryption : NetCryptoProviderBase
+public sealed class NetTripleDesEncryption : NetCryptoProviderBase
 {
-	public NetTripleDESEncryption(NetPeer peer)
+	public NetTripleDesEncryption(NetPeer peer)
 		: base(peer, TripleDES.Create())
 	{
 	}
 
-	public NetTripleDESEncryption(NetPeer peer, string key)
+	public NetTripleDesEncryption(NetPeer peer, string key)
 		: base(peer, TripleDES.Create())
 	{
 		SetKey(key);
 	}
 
-	public NetTripleDESEncryption(NetPeer peer, byte[] data, int offset, int count)
+	public NetTripleDesEncryption(NetPeer peer, byte[] data, int offset, int count)
 		: base(peer, TripleDES.Create())
 	{
 		SetKey(data, offset, count);

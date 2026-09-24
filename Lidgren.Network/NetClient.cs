@@ -36,11 +36,13 @@ public class NetClient : NetPeer
 		get
 		{
 			NetConnection retval = null;
-			if (m_connections.Count > 0)
+			// ReSharper disable once InconsistentlySynchronizedField
+			if (NetConnections.Count > 0)
 			{
 				try
 				{
-					retval = m_connections[0];
+					// ReSharper disable once InconsistentlySynchronizedField
+					retval = NetConnections[0];
 				}
 				catch
 				{
@@ -84,18 +86,18 @@ public class NetClient : NetPeer
 	/// <returns>server connection, or null if already connected</returns>
 	public override NetConnection Connect(NetEndPoint remoteEndPoint, NetOutgoingMessage hailMessage)
 	{
-		lock (m_connections)
+		lock (NetConnections)
 		{
-			if (m_connections.Count > 0)
+			if (NetConnections.Count > 0)
 			{
 				LogWarning("Connect attempt failed; Already connected");
 				return null;
 			}
 		}
 
-		lock (m_handshakes)
+		lock (Handshakes)
 		{
-			if (m_handshakes.Count > 0)
+			if (Handshakes.Count > 0)
 			{
 				LogWarning("Connect attempt failed; Handshake already in progress");
 				return null;
@@ -114,12 +116,12 @@ public class NetClient : NetPeer
 		var serverConnection = ServerConnection;
 		if (serverConnection == null)
 		{
-			lock (m_handshakes)
+			lock (Handshakes)
 			{
-				if (m_handshakes.Count > 0)
+				if (Handshakes.Count > 0)
 				{
 					LogVerbose("Aborting connection attempt");
-					foreach(var hs in m_handshakes)
+					foreach(var hs in Handshakes)
 						hs.Value.Disconnect(byeMessage);
 					return;
 				}

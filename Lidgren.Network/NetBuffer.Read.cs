@@ -13,29 +13,29 @@ namespace Lidgren.Network;
 /// </summary>
 public partial class NetBuffer
 {
-	private const string c_readOverflowError = "Trying to read past the buffer size - likely caused by mismatching Write/Reads, different size or order.";
-	private const int c_bufferSize = 64; // Min 8 to hold anything but strings. Increase it if readed strings usally don't fit inside the buffer
-	private static object s_buffer;
+	private const string ReadOverflowError = "Trying to read past the buffer size - likely caused by mismatching Write/Reads, different size or order.";
+	private const int BufferSize = 64; // Min 8 to hold anything but strings. Increase it if readed strings usally don't fit inside the buffer
+	private static object _buffer;
 
 	/// <summary>
 	/// Reads a boolean value (stored as a single bit) written using Write(bool)
 	/// </summary>
 	public bool ReadBoolean()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 1, c_readOverflowError);
-		var retval = NetBitWriter.ReadByte(m_data, 1, m_readPosition);
-		m_readPosition += 1;
-		return (retval > 0 ? true : false);
+		NetException.Assert(BitLength - ReadPosition >= 1, ReadOverflowError);
+		var retval = NetBitWriter.ReadByte(DataBuffer, 1, ReadPosition);
+		ReadPosition += 1;
+		return retval > 0;
 	}
-		
+
 	/// <summary>
 	/// Reads a byte
 	/// </summary>
 	public byte ReadByte()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 8, c_readOverflowError);
-		var retval = NetBitWriter.ReadByte(m_data, 8, m_readPosition);
-		m_readPosition += 8;
+		NetException.Assert(BitLength - ReadPosition >= 8, ReadOverflowError);
+		var retval = NetBitWriter.ReadByte(DataBuffer, 8, ReadPosition);
+		ReadPosition += 8;
 		return retval;
 	}
 
@@ -44,13 +44,13 @@ public partial class NetBuffer
 	/// </summary>
 	public bool ReadByte(out byte result)
 	{
-		if (m_bitLength - m_readPosition < 8)
+		if (BitLength - ReadPosition < 8)
 		{
 			result = 0;
 			return false;
 		}
-		result = NetBitWriter.ReadByte(m_data, 8, m_readPosition);
-		m_readPosition += 8;
+		result = NetBitWriter.ReadByte(DataBuffer, 8, ReadPosition);
+		ReadPosition += 8;
 		return true;
 	}
 
@@ -60,9 +60,9 @@ public partial class NetBuffer
 	[CLSCompliant(false)]
 	public sbyte ReadSByte()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 8, c_readOverflowError);
-		var retval = NetBitWriter.ReadByte(m_data, 8, m_readPosition);
-		m_readPosition += 8;
+		NetException.Assert(BitLength - ReadPosition >= 8, ReadOverflowError);
+		var retval = NetBitWriter.ReadByte(DataBuffer, 8, ReadPosition);
+		ReadPosition += 8;
 		return (sbyte)retval;
 	}
 
@@ -71,9 +71,9 @@ public partial class NetBuffer
 	/// </summary>
 	public byte ReadByte(int numberOfBits)
 	{
-		NetException.Assert(numberOfBits > 0 && numberOfBits <= 8, "ReadByte(bits) can only read between 1 and 8 bits");
-		var retval = NetBitWriter.ReadByte(m_data, numberOfBits, m_readPosition);
-		m_readPosition += numberOfBits;
+		NetException.Assert(numberOfBits is > 0 and <= 8, "ReadByte(bits) can only read between 1 and 8 bits");
+		var retval = NetBitWriter.ReadByte(DataBuffer, numberOfBits, ReadPosition);
+		ReadPosition += numberOfBits;
 		return retval;
 	}
 
@@ -82,11 +82,11 @@ public partial class NetBuffer
 	/// </summary>
 	public byte[] ReadBytes(int numberOfBytes)
 	{
-		NetException.Assert(m_bitLength - m_readPosition + 7 >= (numberOfBytes * 8), c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition + 7 >= numberOfBytes * 8, ReadOverflowError);
 
 		var retval = new byte[numberOfBytes];
-		NetBitWriter.ReadBytes(m_data, numberOfBytes, m_readPosition, retval, 0);
-		m_readPosition += (8 * numberOfBytes);
+		NetBitWriter.ReadBytes(DataBuffer, numberOfBytes, ReadPosition, retval, 0);
+		ReadPosition += 8 * numberOfBytes;
 		return retval;
 	}
 
@@ -95,15 +95,15 @@ public partial class NetBuffer
 	/// </summary>
 	public bool ReadBytes(int numberOfBytes, out byte[] result)
 	{
-		if (m_bitLength - m_readPosition + 7 < (numberOfBytes * 8))
+		if (BitLength - ReadPosition + 7 < numberOfBytes * 8)
 		{
 			result = null;
 			return false;
 		}
 
 		result = new byte[numberOfBytes];
-		NetBitWriter.ReadBytes(m_data, numberOfBytes, m_readPosition, result, 0);
-		m_readPosition += (8 * numberOfBytes);
+		NetBitWriter.ReadBytes(DataBuffer, numberOfBytes, ReadPosition, result, 0);
+		ReadPosition += 8 * numberOfBytes;
 		return true;
 	}
 
@@ -115,12 +115,11 @@ public partial class NetBuffer
 	/// <param name="numberOfBytes">The number of bytes to read</param>
 	public void ReadBytes(byte[] into, int offset, int numberOfBytes)
 	{
-		NetException.Assert(m_bitLength - m_readPosition + 7 >= (numberOfBytes * 8), c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition + 7 >= numberOfBytes * 8, ReadOverflowError);
 		NetException.Assert(offset + numberOfBytes <= into.Length);
 
-		NetBitWriter.ReadBytes(m_data, numberOfBytes, m_readPosition, into, offset);
-		m_readPosition += (8 * numberOfBytes);
-		return;
+		NetBitWriter.ReadBytes(DataBuffer, numberOfBytes, ReadPosition, into, offset);
+		ReadPosition += 8 * numberOfBytes;
 	}
 
 	/// <summary>
@@ -131,29 +130,27 @@ public partial class NetBuffer
 	/// <param name="numberOfBits">The number of bits to read</param>
 	public void ReadBits(byte[] into, int offset, int numberOfBits)
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= numberOfBits, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= numberOfBits, ReadOverflowError);
 		NetException.Assert(offset + NetUtility.BytesToHoldBits(numberOfBits) <= into.Length);
 
 		var numberOfWholeBytes = numberOfBits / 8;
-		var extraBits = numberOfBits - (numberOfWholeBytes * 8);
+		var extraBits = numberOfBits - numberOfWholeBytes * 8;
 
-		NetBitWriter.ReadBytes(m_data, numberOfWholeBytes, m_readPosition, into, offset);
-		m_readPosition += (8 * numberOfWholeBytes);
+		NetBitWriter.ReadBytes(DataBuffer, numberOfWholeBytes, ReadPosition, into, offset);
+		ReadPosition += 8 * numberOfWholeBytes;
 
 		if (extraBits > 0)
 			into[offset + numberOfWholeBytes] = ReadByte(extraBits);
-
-		return;
 	}
 
 	/// <summary>
 	/// Reads a 16 bit signed integer written using Write(Int16)
 	/// </summary>
-	public Int16 ReadInt16()
+	public short ReadInt16()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 16, c_readOverflowError);
-		uint retval = NetBitWriter.ReadUInt16(m_data, 16, m_readPosition);
-		m_readPosition += 16;
+		NetException.Assert(BitLength - ReadPosition >= 16, ReadOverflowError);
+		uint retval = NetBitWriter.ReadUInt16(DataBuffer, 16, ReadPosition);
+		ReadPosition += 16;
 		return (short)retval;
 	}
 
@@ -161,52 +158,52 @@ public partial class NetBuffer
 	/// Reads a 16 bit unsigned integer written using Write(UInt16)
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt16 ReadUInt16()
+	public ushort ReadUInt16()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 16, c_readOverflowError);
-		uint retval = NetBitWriter.ReadUInt16(m_data, 16, m_readPosition);
-		m_readPosition += 16;
+		NetException.Assert(BitLength - ReadPosition >= 16, ReadOverflowError);
+		uint retval = NetBitWriter.ReadUInt16(DataBuffer, 16, ReadPosition);
+		ReadPosition += 16;
 		return (ushort)retval;
 	}
 
 	/// <summary>
 	/// Reads a 32 bit signed integer written using Write(Int32)
 	/// </summary>
-	public Int32 ReadInt32()
+	public int ReadInt32()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 32, c_readOverflowError);
-		var retval = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-		m_readPosition += 32;
-		return (Int32)retval;
+		NetException.Assert(BitLength - ReadPosition >= 32, ReadOverflowError);
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+		ReadPosition += 32;
+		return (int)retval;
 	}
 
 	/// <summary>
 	/// Reads a 32 bit signed integer written using Write(Int32)
 	/// </summary>
 	[CLSCompliant(false)]
-	public bool ReadInt32(out Int32 result)
+	public bool ReadInt32(out int result)
 	{
-		if (m_bitLength - m_readPosition < 32)
+		if (BitLength - ReadPosition < 32)
 		{
 			result = 0;
 			return false;
 		}
 
-		result = (Int32)NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-		m_readPosition += 32;
+		result = (int)NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+		ReadPosition += 32;
 		return true;
 	}
 
 	/// <summary>
 	/// Reads a signed integer stored in 1 to 32 bits, written using Write(Int32, Int32)
 	/// </summary>
-	public Int32 ReadInt32(int numberOfBits)
+	public int ReadInt32(int numberOfBits)
 	{
-		NetException.Assert(numberOfBits > 0 && numberOfBits <= 32, "ReadInt32(bits) can only read between 1 and 32 bits");
-		NetException.Assert(m_bitLength - m_readPosition >= numberOfBits, c_readOverflowError);
+		NetException.Assert(numberOfBits is > 0 and <= 32, "ReadInt32(bits) can only read between 1 and 32 bits");
+		NetException.Assert(BitLength - ReadPosition >= numberOfBits, ReadOverflowError);
 
-		var retval = NetBitWriter.ReadUInt32(m_data, numberOfBits, m_readPosition);
-		m_readPosition += numberOfBits;
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, numberOfBits, ReadPosition);
+		ReadPosition += numberOfBits;
 
 		if (numberOfBits == 32)
 			return (int)retval;
@@ -218,9 +215,9 @@ public partial class NetBuffer
 		// negative
 		unchecked
 		{
-			var mask = ((uint)-1) >> (33 - numberOfBits);
+			var mask = (uint)-1 >> (33 - numberOfBits);
 			var tmp = (retval & mask) + 1;
-			return -((int)tmp);
+			return -(int)tmp;
 		}
 	}
 
@@ -228,11 +225,11 @@ public partial class NetBuffer
 	/// Reads an 32 bit unsigned integer written using Write(UInt32)
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt32 ReadUInt32()
+	public uint ReadUInt32()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 32, c_readOverflowError);
-		var retval = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-		m_readPosition += 32;
+		NetException.Assert(BitLength - ReadPosition >= 32, ReadOverflowError);
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+		ReadPosition += 32;
 		return retval;
 	}
 
@@ -240,15 +237,15 @@ public partial class NetBuffer
 	/// Reads an 32 bit unsigned integer written using Write(UInt32) and returns true for success
 	/// </summary>
 	[CLSCompliant(false)]
-	public bool ReadUInt32(out UInt32 result)
+	public bool ReadUInt32(out uint result)
 	{
-		if (m_bitLength - m_readPosition < 32)
+		if (BitLength - ReadPosition < 32)
 		{
 			result = 0;
 			return false;
 		}
-		result = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-		m_readPosition += 32;
+		result = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+		ReadPosition += 32;
 		return true;
 	}
 
@@ -256,13 +253,13 @@ public partial class NetBuffer
 	/// Reads an unsigned integer stored in 1 to 32 bits, written using Write(UInt32, Int32)
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt32 ReadUInt32(int numberOfBits)
+	public uint ReadUInt32(int numberOfBits)
 	{
-		NetException.Assert(numberOfBits > 0 && numberOfBits <= 32, "ReadUInt32(bits) can only read between 1 and 32 bits");
+		NetException.Assert(numberOfBits is > 0 and <= 32, "ReadUInt32(bits) can only read between 1 and 32 bits");
 		//NetException.Assert(m_bitLength - m_readBitPtr >= numberOfBits, "tried to read past buffer size");
 
-		var retval = NetBitWriter.ReadUInt32(m_data, numberOfBits, m_readPosition);
-		m_readPosition += numberOfBits;
+		var retval = NetBitWriter.ReadUInt32(DataBuffer, numberOfBits, ReadPosition);
+		ReadPosition += numberOfBits;
 		return retval;
 	}
 
@@ -270,26 +267,26 @@ public partial class NetBuffer
 	/// Reads a 64 bit unsigned integer written using Write(UInt64)
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt64 ReadUInt64()
+	public ulong ReadUInt64()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 64, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 64, ReadOverflowError);
 
-		ulong low = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-		m_readPosition += 32;
-		ulong high = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
+		ulong low = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+		ReadPosition += 32;
+		ulong high = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
 
 		var retval = low + (high << 32);
 
-		m_readPosition += 32;
+		ReadPosition += 32;
 		return retval;
 	}
 
 	/// <summary>
 	/// Reads a 64 bit signed integer written using Write(Int64)
 	/// </summary>
-	public Int64 ReadInt64()
+	public long ReadInt64()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 64, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 64, ReadOverflowError);
 		unchecked
 		{
 			var retval = ReadUInt64();
@@ -302,31 +299,31 @@ public partial class NetBuffer
 	/// Reads an unsigned integer stored in 1 to 64 bits, written using Write(UInt64, Int32)
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt64 ReadUInt64(int numberOfBits)
+	public ulong ReadUInt64(int numberOfBits)
 	{
-		NetException.Assert(numberOfBits > 0 && numberOfBits <= 64, "ReadUInt64(bits) can only read between 1 and 64 bits");
-		NetException.Assert(m_bitLength - m_readPosition >= numberOfBits, c_readOverflowError);
+		NetException.Assert(numberOfBits is > 0 and <= 64, "ReadUInt64(bits) can only read between 1 and 64 bits");
+		NetException.Assert(BitLength - ReadPosition >= numberOfBits, ReadOverflowError);
 
 		ulong retval;
 		if (numberOfBits <= 32)
 		{
-			retval = (ulong)NetBitWriter.ReadUInt32(m_data, numberOfBits, m_readPosition);
+			retval = NetBitWriter.ReadUInt32(DataBuffer, numberOfBits, ReadPosition);
 		}
 		else
 		{
-			retval = NetBitWriter.ReadUInt32(m_data, 32, m_readPosition);
-			retval |= (UInt64)NetBitWriter.ReadUInt32(m_data, numberOfBits - 32, m_readPosition + 32) << 32;
+			retval = NetBitWriter.ReadUInt32(DataBuffer, 32, ReadPosition);
+			retval |= (ulong)NetBitWriter.ReadUInt32(DataBuffer, numberOfBits - 32, ReadPosition + 32) << 32;
 		}
-		m_readPosition += numberOfBits;
+		ReadPosition += numberOfBits;
 		return retval;
 	}
 
 	/// <summary>
 	/// Reads a signed integer stored in 1 to 64 bits, written using Write(Int64, Int32)
 	/// </summary>
-	public Int64 ReadInt64(int numberOfBits)
+	public long ReadInt64(int numberOfBits)
 	{
-		NetException.Assert(((numberOfBits > 0) && (numberOfBits <= 64)), "ReadInt64(bits) can only read between 1 and 64 bits");
+		NetException.Assert(numberOfBits is > 0 and <= 64, "ReadInt64(bits) can only read between 1 and 64 bits");
 		return (long)ReadUInt64(numberOfBits);
 	}
 
@@ -343,19 +340,19 @@ public partial class NetBuffer
 	/// </summary>
 	public float ReadSingle()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 32, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 32, ReadOverflowError);
 
-		if ((m_readPosition & 7) == 0) // read directly
+		if ((ReadPosition & 7) == 0) // read directly
 		{
-			var retval = BitConverter.ToSingle(m_data, m_readPosition >> 3);
-			m_readPosition += 32;
+			var retval = BitConverter.ToSingle(DataBuffer, ReadPosition >> 3);
+			ReadPosition += 32;
 			return retval;
 		}
 
-		var bytes = (byte[]) Interlocked.Exchange(ref s_buffer, null) ?? new byte[c_bufferSize];
+		var bytes = (byte[]) Interlocked.Exchange(ref _buffer, null) ?? new byte[BufferSize];
 		ReadBytes(bytes, 0, 4);
 		var res = BitConverter.ToSingle(bytes, 0);
-		s_buffer = bytes;
+		_buffer = bytes;
 		return res;
 	}
 
@@ -364,23 +361,23 @@ public partial class NetBuffer
 	/// </summary>
 	public bool ReadSingle(out float result)
 	{
-		if (m_bitLength - m_readPosition < 32)
+		if (BitLength - ReadPosition < 32)
 		{
 			result = 0.0f;
 			return false;
 		}
 
-		if ((m_readPosition & 7) == 0) // read directly
+		if ((ReadPosition & 7) == 0) // read directly
 		{
-			result = BitConverter.ToSingle(m_data, m_readPosition >> 3);
-			m_readPosition += 32;
+			result = BitConverter.ToSingle(DataBuffer, ReadPosition >> 3);
+			ReadPosition += 32;
 			return true;
 		}
 
-		var bytes = (byte[]) Interlocked.Exchange(ref s_buffer, null) ?? new byte[c_bufferSize];
+		var bytes = (byte[]) Interlocked.Exchange(ref _buffer, null) ?? new byte[BufferSize];
 		ReadBytes(bytes, 0, 4);
 		result = BitConverter.ToSingle(bytes, 0);
-		s_buffer = bytes;
+		_buffer = bytes;
 		return true;
 	}
 
@@ -389,20 +386,20 @@ public partial class NetBuffer
 	/// </summary>
 	public double ReadDouble()
 	{
-		NetException.Assert(m_bitLength - m_readPosition >= 64, c_readOverflowError);
+		NetException.Assert(BitLength - ReadPosition >= 64, ReadOverflowError);
 
-		if ((m_readPosition & 7) == 0) // read directly
+		if ((ReadPosition & 7) == 0) // read directly
 		{
 			// read directly
-			var retval = BitConverter.ToDouble(m_data, m_readPosition >> 3);
-			m_readPosition += 64;
+			var retval = BitConverter.ToDouble(DataBuffer, ReadPosition >> 3);
+			ReadPosition += 64;
 			return retval;
 		}
 
-		var bytes = (byte[]) Interlocked.Exchange(ref s_buffer, null) ?? new byte[c_bufferSize];
+		var bytes = (byte[]) Interlocked.Exchange(ref _buffer, null) ?? new byte[BufferSize];
 		ReadBytes(bytes, 0, 8);
 		var res = BitConverter.ToDouble(bytes, 0);
-		s_buffer = bytes;
+		_buffer = bytes;
 		return res;
 	}
 
@@ -418,9 +415,9 @@ public partial class NetBuffer
 	{
 		var num1 = 0;
 		var num2 = 0;
-		while (m_bitLength - m_readPosition >= 8)
+		while (BitLength - ReadPosition >= 8)
 		{
-			var num3 = this.ReadByte();
+			var num3 = ReadByte();
 			num1 |= (num3 & 0x7f) << num2;
 			num2 += 7;
 			if ((num3 & 0x80) == 0)
@@ -439,7 +436,7 @@ public partial class NetBuffer
 	{
 		var num1 = 0;
 		var num2 = 0;
-		while (m_bitLength - m_readPosition >= 8)
+		while (BitLength - ReadPosition >= 8)
 		{
 			byte num3;
 			if (ReadByte(out num3) == false)
@@ -471,27 +468,27 @@ public partial class NetBuffer
 	/// <summary>
 	/// Reads a variable sized Int64 written using WriteVariableInt64()
 	/// </summary>
-	public Int64 ReadVariableInt64()
+	public long ReadVariableInt64()
 	{
 		var n = ReadVariableUInt64();
-		return (Int64)(n >> 1) ^ -(long)(n & 1); // decode zigzag
+		return (long)(n >> 1) ^ -(long)(n & 1); // decode zigzag
 	}
 
 	/// <summary>
 	/// Reads a variable sized UInt32 written using WriteVariableInt64()
 	/// </summary>
 	[CLSCompliant(false)]
-	public UInt64 ReadVariableUInt64()
+	public ulong ReadVariableUInt64()
 	{
-		UInt64 num1 = 0;
+		ulong num1 = 0;
 		var num2 = 0;
-		while (m_bitLength - m_readPosition >= 8)
+		while (BitLength - ReadPosition >= 8)
 		{
 			//if (num2 == 0x23)
 			//	throw new FormatException("Bad 7-bit encoded integer");
 
-			var num3 = this.ReadByte();
-			num1 |= ((UInt64)num3 & 0x7f) << num2;
+			var num3 = ReadByte();
+			num1 |= ((ulong)num3 & 0x7f) << num2;
 			num2 += 7;
 			if ((num3 & 0x80) == 0)
 				return num1;
@@ -510,7 +507,7 @@ public partial class NetBuffer
 	{
 		var encodedVal = ReadUInt32(numberOfBits);
 		var maxVal = (1 << numberOfBits) - 1;
-		return ((float)(encodedVal + 1) / (float)(maxVal + 1) - 0.5f) * 2.0f;
+		return ((encodedVal + 1) / (float)(maxVal + 1) - 0.5f) * 2.0f;
 	}
 
 	/// <summary>
@@ -522,7 +519,7 @@ public partial class NetBuffer
 	{
 		var encodedVal = ReadUInt32(numberOfBits);
 		var maxVal = (1 << numberOfBits) - 1;
-		return (float)(encodedVal + 1) / (float)(maxVal + 1);
+		return (encodedVal + 1) / (float)(maxVal + 1);
 	}
 
 	/// <summary>
@@ -537,8 +534,8 @@ public partial class NetBuffer
 		var range = max - min;
 		var maxVal = (1 << numberOfBits) - 1;
 		var encodedVal = (float)ReadUInt32(numberOfBits);
-		var unit = encodedVal / (float)maxVal;
-		return min + (unit * range);
+		var unit = encodedVal / maxVal;
+		return min + unit * range;
 	}
 
 	/// <summary>
@@ -566,7 +563,7 @@ public partial class NetBuffer
 	{
 		var range = (ulong)(max - min);
 		var numBits = NetUtility.BitsToHoldUInt64(range);
-	
+
 		var rvalue = ReadUInt64(numBits);
 		return min + (long)rvalue;
 	}
@@ -579,33 +576,33 @@ public partial class NetBuffer
 		var byteLen = (int)ReadVariableUInt32();
 
 		if (byteLen <= 0)
-			return String.Empty;
+			return string.Empty;
 
-		if ((ulong)(m_bitLength - m_readPosition) < ((ulong)byteLen * 8))
+		if ((ulong)(BitLength - ReadPosition) < (ulong)byteLen * 8)
 		{
 			// not enough data
 #if DEBUG
-				
-			throw new NetException(c_readOverflowError);
+
+			throw new NetException(ReadOverflowError);
 #else
 				m_readPosition = m_bitLength;
 				return null; // unfortunate; but we need to protect against DDOS
 #endif
 		}
 
-		if ((m_readPosition & 7) == 0)
+		if ((ReadPosition & 7) == 0)
 		{
 			// read directly
-			var retval = System.Text.Encoding.UTF8.GetString(m_data, m_readPosition >> 3, byteLen);
-			m_readPosition += (8 * byteLen);
+			var retval = Encoding.UTF8.GetString(DataBuffer, ReadPosition >> 3, byteLen);
+			ReadPosition += 8 * byteLen;
 			return retval;
 		}
 
-		if (byteLen <= c_bufferSize) {
-			var buffer = (byte[]) Interlocked.Exchange(ref s_buffer, null) ?? new byte[c_bufferSize];
+		if (byteLen <= BufferSize) {
+			var buffer = (byte[]) Interlocked.Exchange(ref _buffer, null) ?? new byte[BufferSize];
 			ReadBytes(buffer, 0, byteLen);
 			var retval = Encoding.UTF8.GetString(buffer, 0, byteLen);
-			s_buffer = buffer;
+			_buffer = buffer;
 			return retval;
 		} else {
 			var bytes = ReadBytes(byteLen);
@@ -621,38 +618,38 @@ public partial class NetBuffer
 		uint byteLen;
 		if (ReadVariableUInt32(out byteLen) == false)
 		{
-			result = String.Empty;
+			result = string.Empty;
 			return false;
 		}
 
 		if (byteLen <= 0)
 		{
-			result = String.Empty;
+			result = string.Empty;
 			return true;
 		}
 
-		if (m_bitLength - m_readPosition < (byteLen * 8))
+		if (BitLength - ReadPosition < byteLen * 8)
 		{
-			result = String.Empty;
+			result = string.Empty;
 			return false;
 		}
 
-		if ((m_readPosition & 7) == 0)
+		if ((ReadPosition & 7) == 0)
 		{
 			// read directly
-			result = System.Text.Encoding.UTF8.GetString(m_data, m_readPosition >> 3, (int)byteLen);
-			m_readPosition += (8 * (int)byteLen);
+			result = Encoding.UTF8.GetString(DataBuffer, ReadPosition >> 3, (int)byteLen);
+			ReadPosition += 8 * (int)byteLen;
 			return true;
 		}
 
 		byte[] bytes;
 		if (ReadBytes((int)byteLen, out bytes) == false)
 		{
-			result = String.Empty;
+			result = string.Empty;
 			return false;
 		}
 
-		result = System.Text.Encoding.UTF8.GetString(bytes, 0, bytes.Length);
+		result = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
 		return true;
 	}
 
@@ -661,19 +658,19 @@ public partial class NetBuffer
 	/// </summary>
 	public double ReadTime(NetConnection connection, bool highPrecision)
 	{
-		var remoteTime = (highPrecision ? ReadDouble() : (double)ReadSingle());
+		var remoteTime = highPrecision ? ReadDouble() : ReadSingle();
 
 		if (connection == null)
 			throw new NetException("Cannot call ReadTime() on message without a connected sender (ie. unconnected messages)");
 
 		// lets bypass NetConnection.GetLocalTime for speed
-		return remoteTime - connection.m_remoteTimeOffset;
+		return remoteTime - connection.RemoteTimeOffsetValue;
 	}
 
 	/// <summary>
 	/// Reads a stored IPv4 endpoint description
 	/// </summary>
-	public NetEndPoint ReadIPEndPoint()
+	public NetEndPoint ReadIpEndPoint()
 	{
 		var len = ReadByte();
 		var addressBytes = ReadBytes(len);
@@ -688,7 +685,7 @@ public partial class NetBuffer
 	/// </summary>
 	public void SkipPadBits()
 	{
-		m_readPosition = ((m_readPosition + 7) >> 3) * 8;
+		ReadPosition = ((ReadPosition + 7) >> 3) * 8;
 	}
 
 	/// <summary>
@@ -696,7 +693,7 @@ public partial class NetBuffer
 	/// </summary>
 	public void ReadPadBits()
 	{
-		m_readPosition = ((m_readPosition + 7) >> 3) * 8;
+		ReadPosition = ((ReadPosition + 7) >> 3) * 8;
 	}
 
 	/// <summary>
@@ -704,6 +701,6 @@ public partial class NetBuffer
 	/// </summary>
 	public void SkipPadBits(int numberOfBits)
 	{
-		m_readPosition += numberOfBits;
+		ReadPosition += numberOfBits;
 	}
 }

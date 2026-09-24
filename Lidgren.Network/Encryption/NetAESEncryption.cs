@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 
-namespace Lidgren.Network;
+namespace Lidgren.Network.Encryption;
 
-public class NetAESEncryption : NetCryptoProviderBase
+public sealed class NetAesEncryption : NetCryptoProviderBase
 {
-	public NetAESEncryption(NetPeer peer)
+	public NetAesEncryption(NetPeer peer)
 #if UNITY
 			: base(peer, new RijndaelManaged())
 #else
@@ -13,7 +13,7 @@ public class NetAESEncryption : NetCryptoProviderBase
 	{
 	}
 
-	public NetAESEncryption(NetPeer peer, string key)
+	public NetAesEncryption(NetPeer peer, string key)
 #if UNITY
 			: base(peer, new RijndaelManaged())
 #else
@@ -23,7 +23,7 @@ public class NetAESEncryption : NetCryptoProviderBase
 		SetKey(key);
 	}
 
-	public NetAESEncryption(NetPeer peer, byte[] data, int offset, int count)
+	public NetAesEncryption(NetPeer peer, byte[] data, int offset, int count)
 #if UNITY
 			: base(peer, new RijndaelManaged())
 #else

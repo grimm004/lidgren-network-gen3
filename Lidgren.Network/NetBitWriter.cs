@@ -35,10 +35,10 @@ public static class NetBitWriter
 	/// </summary>
 	public static byte ReadByte(byte[] fromBuffer, int numberOfBits, int readBitOffset)
 	{
-		NetException.Assert(((numberOfBits > 0) && (numberOfBits < 9)), "Read() can only read between 1 and 8 bits");
+		NetException.Assert(numberOfBits is > 0 and < 9, "Read() can only read between 1 and 8 bits");
 
 		var bytePtr = readBitOffset >> 3;
-		var startReadAtIndex = readBitOffset - (bytePtr * 8); // (readBitOffset % 8);
+		var startReadAtIndex = readBitOffset - bytePtr * 8; // (readBitOffset % 8);
 
 		if (startReadAtIndex == 0 && numberOfBits == 8)
 			return fromBuffer[bytePtr];
@@ -69,7 +69,7 @@ public static class NetBitWriter
 	public static void ReadBytes(byte[] fromBuffer, int numberOfBytes, int readBitOffset, byte[] destination, int destinationByteOffset)
 	{
 		var readPtr = readBitOffset >> 3;
-		var startReadAtIndex = readBitOffset - (readPtr * 8); // (readBitOffset % 8);
+		var startReadAtIndex = readBitOffset - readPtr * 8; // (readBitOffset % 8);
 
 		if (startReadAtIndex == 0)
 		{
@@ -92,8 +92,6 @@ public static class NetBitWriter
 
 			destination[destinationByteOffset++] = (byte)(b | (second << secondPartLen));
 		}
-
-		return;
 	}
 
 	/// <summary>
@@ -104,7 +102,7 @@ public static class NetBitWriter
 		if (numberOfBits == 0)
 			return;
 
-		NetException.Assert(((numberOfBits >= 0) && (numberOfBits <= 8)), "Must write between 0 and 8 bits!");
+		NetException.Assert(numberOfBits is >= 0 and <= 8, "Must write between 0 and 8 bits!");
 
 		// Mask out all the bits we dont want
 		source = (byte)(source & (0xFF >> (8 - numberOfBits)));
@@ -155,7 +153,7 @@ public static class NetBitWriter
 	public static void WriteBytes(byte[] source, int sourceByteOffset, int numberOfBytes, byte[] destination, int destBitOffset)
 	{
 		var dstBytePtr = destBitOffset >> 3;
-		var firstPartLen = (destBitOffset % 8);
+		var firstPartLen = destBitOffset % 8;
 
 		if (firstPartLen == 0)
 		{
@@ -179,8 +177,6 @@ public static class NetBitWriter
 			destination[dstBytePtr] &= (byte)(255 << firstPartLen); // clear before writing
 			destination[dstBytePtr] |= (byte)(src >> lastPartLen); // write second half
 		}
-
-		return;
 	}
 
 	/// <summary>
@@ -202,7 +198,7 @@ public static class NetBitWriter
 #else
 	public static ushort ReadUInt16(byte[] fromBuffer, int numberOfBits, int readBitOffset)
 	{
-		Debug.Assert(((numberOfBits > 0) && (numberOfBits <= 16)), "ReadUInt16() can only read between 1 and 16 bits");
+		Debug.Assert(numberOfBits is > 0 and <= 16, "ReadUInt16() can only read between 1 and 16 bits");
 #endif
 		ushort returnValue;
 		if (numberOfBits <= 8)
@@ -246,10 +242,10 @@ public static class NetBitWriter
 				}
 			}
 #else
-		
+
 	public static uint ReadUInt32(byte[] fromBuffer, int numberOfBits, int readBitOffset)
 	{
-		NetException.Assert(((numberOfBits > 0) && (numberOfBits <= 32)), "ReadUInt32() can only read between 1 and 32 bits");
+		NetException.Assert(numberOfBits is > 0 and <= 32, "ReadUInt32() can only read between 1 and 32 bits");
 #endif
 		uint returnValue;
 		if (numberOfBits <= 8)
@@ -307,7 +303,7 @@ public static class NetBitWriter
 		if (numberOfBits == 0)
 			return;
 
-		NetException.Assert((numberOfBits >= 0 && numberOfBits <= 16), "numberOfBits must be between 0 and 16");
+		NetException.Assert(numberOfBits is >= 0 and <= 16, "numberOfBits must be between 0 and 16");
 #if BIGENDIAN
 			// reorder bytes
 			uint intSource = source;
@@ -316,15 +312,14 @@ public static class NetBitWriter
 #endif
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)source, numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)source, numberOfBits, destination, destinationBitOffset);
 			return;
 		}
 
-		NetBitWriter.WriteByte((byte)source, 8, destination, destinationBitOffset);
+		WriteByte((byte)source, 8, destination, destinationBitOffset);
 
 		numberOfBits -= 8;
-		if (numberOfBits > 0)
-			NetBitWriter.WriteByte((byte)(source >> 8), numberOfBits, destination, destinationBitOffset + 8);
+		WriteByte((byte)(source >> 8), numberOfBits, destination, destinationBitOffset + 8);
 	}
 
 	/// <summary>
@@ -344,32 +339,32 @@ public static class NetBitWriter
 		var returnValue = destinationBitOffset + numberOfBits;
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)source, numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)source, numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)source, 8, destination, destinationBitOffset);
+		WriteByte((byte)source, 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 8), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 8), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 8), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 8), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 16), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 16), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 16), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 16), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
-		NetBitWriter.WriteByte((byte)(source >> 24), numberOfBits, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 24), numberOfBits, destination, destinationBitOffset);
 		return returnValue;
 	}
 
@@ -393,75 +388,73 @@ public static class NetBitWriter
 		var returnValue = destinationBitOffset + numberOfBits;
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)source, numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)source, numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)source, 8, destination, destinationBitOffset);
+		WriteByte((byte)source, 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 8), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 8), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 8), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 8), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 16), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 16), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 16), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 16), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 24), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 24), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 24), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 24), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 32), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 32), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 32), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 32), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 40), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 40), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 40), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 40), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 48), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 48), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 48), 8, destination, destinationBitOffset);
+		WriteByte((byte)(source >> 48), 8, destination, destinationBitOffset);
 		destinationBitOffset += 8;
 		numberOfBits -= 8;
 
 		if (numberOfBits <= 8)
 		{
-			NetBitWriter.WriteByte((byte)(source >> 56), numberOfBits, destination, destinationBitOffset);
+			WriteByte((byte)(source >> 56), numberOfBits, destination, destinationBitOffset);
 			return returnValue;
 		}
-		NetBitWriter.WriteByte((byte)(source >> 56), 8, destination, destinationBitOffset);
-		destinationBitOffset += 8;
-		numberOfBits -= 8;
+		WriteByte((byte)(source >> 56), 8, destination, destinationBitOffset);
 
 		return returnValue;
 	}
@@ -478,11 +471,11 @@ public static class NetBitWriter
 	public static int WriteVariableUInt32(byte[] intoBuffer, int offset, uint value)
 	{
 		var retval = 0;
-		var num1 = (uint)value;
+		var num1 = value;
 		while (num1 >= 0x80)
 		{
 			intoBuffer[offset + retval] = (byte)(num1 | 0x80);
-			num1 = num1 >> 7;
+			num1 >>= 7;
 			retval++;
 		}
 		intoBuffer[offset + retval] = (byte)num1;

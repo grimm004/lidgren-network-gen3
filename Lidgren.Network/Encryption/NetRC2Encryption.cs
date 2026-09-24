@@ -1,21 +1,21 @@
 using System.Security.Cryptography;
 
-namespace Lidgren.Network;
+namespace Lidgren.Network.Encryption;
 
-public class NetRC2Encryption : NetCryptoProviderBase
+public sealed class NetRc2Encryption : NetCryptoProviderBase
 {
-	public NetRC2Encryption(NetPeer peer)
+	public NetRc2Encryption(NetPeer peer)
 		: base(peer, RC2.Create())
 	{
 	}
 
-	public NetRC2Encryption(NetPeer peer, string key)
+	public NetRc2Encryption(NetPeer peer, string key)
 		: base(peer, RC2.Create())
 	{
 		SetKey(key);
 	}
 
-	public NetRC2Encryption(NetPeer peer, byte[] data, int offset, int count)
+	public NetRc2Encryption(NetPeer peer, byte[] data, int offset, int count)
 		: base(peer, RC2.Create())
 	{
 		SetKey(data, offset, count);

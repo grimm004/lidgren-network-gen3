@@ -154,7 +154,7 @@ internal static class NetFragmentationHelper
 		var est = GetFragmentationHeaderSize(group, totalBytes, tryChunkSize, totalBytes / tryChunkSize);
 		tryChunkSize = mtu - NetConstants.HeaderByteSize - est; // slightly less naive approximation
 
-		var headerSize = 0;
+		int headerSize;
 		do
 		{
 			tryChunkSize--; // keep reducing chunk size until it fits within MTU including header

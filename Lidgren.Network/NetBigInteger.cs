@@ -2,6 +2,7 @@
 using System.Text;
 using System.Collections;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace Lidgren.Network;
@@ -11,39 +12,39 @@ namespace Lidgren.Network;
 /// </summary>
 internal class NetBigInteger
 {
-	private const long IMASK = 0xffffffffL;
-	private const ulong UIMASK = (ulong)IMASK;
+	private const long Imask = 0xffffffffL;
+	private const ulong UImask = Imask;
 
 	private static readonly int[] ZeroMagnitude = [];
 	private static readonly byte[] ZeroEncoding = [];
 
 	public static readonly NetBigInteger Zero = new(0, ZeroMagnitude, false);
-	public static readonly NetBigInteger One = createUValueOf(1);
-	public static readonly NetBigInteger Two = createUValueOf(2);
-	public static readonly NetBigInteger Three = createUValueOf(3);
-	public static readonly NetBigInteger Ten = createUValueOf(10);
+	public static readonly NetBigInteger One = CreateUValueOf(1);
+	public static readonly NetBigInteger Two = CreateUValueOf(2);
+	public static readonly NetBigInteger Three = CreateUValueOf(3);
+	public static readonly NetBigInteger Ten = CreateUValueOf(10);
 
-	private const int chunk2 = 1;
-	private static readonly NetBigInteger radix2 = ValueOf(2);
-	private static readonly NetBigInteger radix2E = radix2.Pow(chunk2);
+	private const int Chunk2 = 1;
+	private static readonly NetBigInteger Radix2 = ValueOf(2);
+	private static readonly NetBigInteger Radix2E = Radix2.Pow(Chunk2);
 
-	private const int chunk10 = 19;
-	private static readonly NetBigInteger radix10 = ValueOf(10);
-	private static readonly NetBigInteger radix10E = radix10.Pow(chunk10);
+	private const int Chunk10 = 19;
+	private static readonly NetBigInteger Radix10 = ValueOf(10);
+	private static readonly NetBigInteger Radix10E = Radix10.Pow(Chunk10);
 
-	private const int chunk16 = 16;
-	private static readonly NetBigInteger radix16 = ValueOf(16);
-	private static readonly NetBigInteger radix16E = radix16.Pow(chunk16);
+	private const int Chunk16 = 16;
+	private static readonly NetBigInteger Radix16 = ValueOf(16);
+	private static readonly NetBigInteger Radix16E = Radix16.Pow(Chunk16);
 
 	private const int BitsPerByte = 8;
 	private const int BitsPerInt = 32;
 	private const int BytesPerInt = 4;
 
-	private int m_sign; // -1 means -ve; +1 means +ve; 0 means 0;
-	private int[] m_magnitude; // array of ints with [0] being the most significant
-	private int m_numBits = -1; // cache BitCount() value
-	private int m_numBitLength = -1; // cache calcBitLength() value
-	private long m_quote = -1L; // -m^(-1) mod b, b = 2^32 (see Montgomery mult.)
+	private int _sign; // -1 means -ve; +1 means +ve; 0 means 0;
+	private int[] _magnitude; // array of ints with [0] being the most significant
+	private int _numBits = -1; // cache BitCount() value
+	private int _numBitLength = -1; // cache calcBitLength() value
+	private long _quote = -1L; // -m^(-1) mod b, b = 2^32 (see Montgomery mult.)
 
 	private static int GetByteLength(
 		int nBits)
@@ -71,28 +72,28 @@ internal class NetBigInteger
 			if (i == mag.Length)
 			{
 				//					sign = 0;
-				m_magnitude = ZeroMagnitude;
+				_magnitude = ZeroMagnitude;
 			}
 			else
 			{
-				m_sign = signum;
+				_sign = signum;
 
 				if (i == 0)
 				{
-					m_magnitude = mag;
+					_magnitude = mag;
 				}
 				else
 				{
 					// strip leading 0 words
-					m_magnitude = new int[mag.Length - i];
-					Array.Copy(mag, i, m_magnitude, 0, m_magnitude.Length);
+					_magnitude = new int[mag.Length - i];
+					Array.Copy(mag, i, _magnitude, 0, _magnitude.Length);
 				}
 			}
 		}
 		else
 		{
-			m_sign = signum;
-			m_magnitude = mag;
+			_sign = signum;
+			_magnitude = mag;
 		}
 	}
 
@@ -119,23 +120,23 @@ internal class NetBigInteger
 			case 2:
 				// Is there anyway to restrict to binary digits?
 				style = NumberStyles.Integer;
-				chunk = chunk2;
-				r = radix2;
-				rE = radix2E;
+				chunk = Chunk2;
+				r = Radix2;
+				rE = Radix2E;
 				break;
 			case 10:
 				// This style seems to handle spaces and minus sign already (our processing redundant?)
 				style = NumberStyles.Integer;
-				chunk = chunk10;
-				r = radix10;
-				rE = radix10E;
+				chunk = Chunk10;
+				r = Radix10;
+				rE = Radix10E;
 				break;
 			case 16:
 				// TODO Should this be HexNumber?
 				style = NumberStyles.AllowHexSpecifier;
-				chunk = chunk16;
-				r = radix16;
-				rE = radix16E;
+				chunk = Chunk16;
+				r = Radix16;
+				rE = Radix16E;
 				break;
 			default:
 				throw new FormatException("Only bases 2, 10, or 16 allowed");
@@ -143,19 +144,19 @@ internal class NetBigInteger
 
 
 		var index = 0;
-		m_sign = 1;
+		_sign = 1;
 
 		if (str[0] == '-')
 		{
 			if (str.Length == 1)
 				throw new FormatException("Zero length BigInteger");
 
-			m_sign = -1;
+			_sign = -1;
 			index = 1;
 		}
 
 		// strip leading zeros from the string str
-		while (index < str.Length && Int32.Parse(str[index].ToString(), style) == 0)
+		while (index < str.Length && int.Parse(str[index].ToString(), style) == 0)
 		{
 			index++;
 		}
@@ -163,8 +164,8 @@ internal class NetBigInteger
 		if (index >= str.Length)
 		{
 			// zero value - we're done
-			m_sign = 0;
-			m_magnitude = ZeroMagnitude;
+			_sign = 0;
+			_magnitude = ZeroMagnitude;
 			return;
 		}
 
@@ -185,7 +186,7 @@ internal class NetBigInteger
 			{
 				var s = str.Substring(index, chunk);
 				var i = ulong.Parse(s, style);
-				var bi = createUValueOf(i);
+				var bi = CreateUValueOf(i);
 
 				switch (radix)
 				{
@@ -215,9 +216,9 @@ internal class NetBigInteger
 		{
 			var s = str.Substring(index);
 			var i = ulong.Parse(s, style);
-			var bi = createUValueOf(i);
+			var bi = CreateUValueOf(i);
 
-			if (b.m_sign > 0)
+			if (b._sign > 0)
 			{
 				if (radix == 2)
 				{
@@ -252,7 +253,7 @@ internal class NetBigInteger
 		//                index++;
 		//            }
 
-		m_magnitude = b.m_magnitude;
+		_magnitude = b._magnitude;
 	}
 
 	public NetBigInteger(
@@ -270,19 +271,19 @@ internal class NetBigInteger
 			throw new FormatException("Zero length BigInteger");
 		if ((sbyte)bytes[offset] < 0)
 		{
-			m_sign = -1;
+			_sign = -1;
 
 			var end = offset + length;
 
 			int iBval;
 			// strip leading sign bytes
-			for (iBval = offset; iBval < end && ((sbyte)bytes[iBval] == -1); iBval++)
+			for (iBval = offset; iBval < end && (sbyte)bytes[iBval] == -1; iBval++)
 			{
 			}
 
 			if (iBval >= end)
 			{
-				m_magnitude = One.m_magnitude;
+				_magnitude = One._magnitude;
 			}
 			else
 			{
@@ -304,14 +305,14 @@ internal class NetBigInteger
 
 				inverse[index]++;
 
-				m_magnitude = MakeMagnitude(inverse, 0, inverse.Length);
+				_magnitude = MakeMagnitude(inverse, 0, inverse.Length);
 			}
 		}
 		else
 		{
 			// strip leading zero bytes and return magnitude bytes
-			m_magnitude = MakeMagnitude(bytes, offset, length);
-			m_sign = m_magnitude.Length > 0 ? 1 : 0;
+			_magnitude = MakeMagnitude(bytes, offset, length);
+			_sign = _magnitude.Length > 0 ? 1 : 0;
 		}
 	}
 
@@ -385,25 +386,25 @@ internal class NetBigInteger
 		int offset,
 		int length)
 	{
-		if (sign < -1 || sign > 1)
+		if (sign is < -1 or > 1)
 			throw new FormatException("Invalid sign value");
 
 		if (sign == 0)
 		{
 			//sign = 0;
-			m_magnitude = ZeroMagnitude;
+			_magnitude = ZeroMagnitude;
 		}
 		else
 		{
 			// copy bytes
-			m_magnitude = MakeMagnitude(bytes, offset, length);
-			m_sign = m_magnitude.Length < 1 ? 0 : sign;
+			_magnitude = MakeMagnitude(bytes, offset, length);
+			_sign = _magnitude.Length < 1 ? 0 : sign;
 		}
 	}
 
 	public NetBigInteger Abs()
 	{
-		return m_sign >= 0 ? this : Negate();
+		return _sign >= 0 ? this : Negate();
 	}
 
 	// return a = a + b - b preserved.
@@ -417,9 +418,9 @@ internal class NetBigInteger
 
 		while (vI >= 0)
 		{
-			m += ((long)(uint)a[tI] + (long)(uint)b[vI--]);
+			m += (uint)a[tI] + (long)(uint)b[vI--];
 			a[tI--] = (int)m;
-			m = (long)((ulong)m >> 32);
+			m = m >>> 32;
 		}
 
 		if (m != 0)
@@ -435,35 +436,35 @@ internal class NetBigInteger
 	public NetBigInteger Add(
 		NetBigInteger value)
 	{
-		if (m_sign == 0)
+		if (_sign == 0)
 			return value;
 
-		if (m_sign != value.m_sign)
+		if (_sign != value._sign)
 		{
-			if (value.m_sign == 0)
+			if (value._sign == 0)
 				return this;
 
-			if (value.m_sign < 0)
+			if (value._sign < 0)
 				return Subtract(value.Negate());
 
 			return value.Subtract(Negate());
 		}
 
-		return AddToMagnitude(value.m_magnitude);
+		return AddToMagnitude(value._magnitude);
 	}
 
 	private NetBigInteger AddToMagnitude(
 		int[] magToAdd)
 	{
 		int[] big, small;
-		if (m_magnitude.Length < magToAdd.Length)
+		if (_magnitude.Length < magToAdd.Length)
 		{
 			big = magToAdd;
-			small = m_magnitude;
+			small = _magnitude;
 		}
 		else
 		{
-			big = m_magnitude;
+			big = _magnitude;
 			small = magToAdd;
 		}
 
@@ -487,27 +488,27 @@ internal class NetBigInteger
 
 		bigCopy = AddMagnitudes(bigCopy, small);
 
-		return new NetBigInteger(m_sign, bigCopy, possibleOverflow);
+		return new NetBigInteger(_sign, bigCopy, possibleOverflow);
 	}
 
 	public NetBigInteger And(
 		NetBigInteger value)
 	{
-		if (m_sign == 0 || value.m_sign == 0)
+		if (_sign == 0 || value._sign == 0)
 		{
 			return Zero;
 		}
 
-		var aMag = m_sign > 0
-			? m_magnitude
-			: Add(One).m_magnitude;
+		var aMag = _sign > 0
+			? _magnitude
+			: Add(One)._magnitude;
 
-		var bMag = value.m_sign > 0
-			? value.m_magnitude
-			: value.Add(One).m_magnitude;
+		var bMag = value._sign > 0
+			? value._magnitude
+			: value.Add(One)._magnitude;
 
-		var resultNeg = m_sign < 0 && value.m_sign < 0;
-		var resultLength = System.Math.Max(aMag.Length, bMag.Length);
+		var resultNeg = _sign < 0 && value._sign < 0;
+		var resultLength = Math.Max(aMag.Length, bMag.Length);
 		var resultMag = new int[resultLength];
 
 		var aStart = resultMag.Length - aMag.Length;
@@ -518,12 +519,12 @@ internal class NetBigInteger
 			var aWord = i >= aStart ? aMag[i - aStart] : 0;
 			var bWord = i >= bStart ? bMag[i - bStart] : 0;
 
-			if (m_sign < 0)
+			if (_sign < 0)
 			{
 				aWord = ~aWord;
 			}
 
-			if (value.m_sign < 0)
+			if (value._sign < 0)
 			{
 				bWord = ~bWord;
 			}
@@ -545,8 +546,8 @@ internal class NetBigInteger
 
 		return result;
 	}
-	
-	private int calcBitLength(
+
+	private int CalcBitLength(
 		int indx,
 		int[] mag)
 	{
@@ -562,14 +563,14 @@ internal class NetBigInteger
 		}
 
 		// bit length for everything after the first int
-		var bitLength = 32 * ((mag.Length - indx) - 1);
+		var bitLength = 32 * (mag.Length - indx - 1);
 
 		// and determine bitlength of first int
 		var firstMag = mag[indx];
 		bitLength += BitLen(firstMag);
 
 		// Check for negative powers of two
-		if (m_sign < 0 && ((firstMag & -firstMag) == firstMag))
+		if (_sign < 0 && (firstMag & -firstMag) == firstMag)
 		{
 			do
 			{
@@ -589,14 +590,14 @@ internal class NetBigInteger
 	{
 		get
 		{
-			if (m_numBitLength == -1)
+			if (_numBitLength == -1)
 			{
-				m_numBitLength = m_sign == 0
+				_numBitLength = _sign == 0
 					? 0
-					: calcBitLength(0, m_magnitude);
+					: CalcBitLength(0, _magnitude);
 			}
 
-			return m_numBitLength;
+			return _numBitLength;
 		}
 	}
 
@@ -607,24 +608,24 @@ internal class NetBigInteger
 		int w)
 	{
 		// Binary search - decision tree (5 tests, rarely 6)
-		return (w < 1 << 15 ? (w < 1 << 7
-			? (w < 1 << 3 ? (w < 1 << 1
-				? (w < 1 << 0 ? (w < 0 ? 32 : 0) : 1)
-				: (w < 1 << 2 ? 2 : 3)) : (w < 1 << 5
-				? (w < 1 << 4 ? 4 : 5)
-				: (w < 1 << 6 ? 6 : 7)))
-			: (w < 1 << 11
-				? (w < 1 << 9 ? (w < 1 << 8 ? 8 : 9) : (w < 1 << 10 ? 10 : 11))
-				: (w < 1 << 13 ? (w < 1 << 12 ? 12 : 13) : (w < 1 << 14 ? 14 : 15)))) : (w < 1 << 23 ? (w < 1 << 19
-			? (w < 1 << 17 ? (w < 1 << 16 ? 16 : 17) : (w < 1 << 18 ? 18 : 19))
-			: (w < 1 << 21 ? (w < 1 << 20 ? 20 : 21) : (w < 1 << 22 ? 22 : 23))) : (w < 1 << 27
-			? (w < 1 << 25 ? (w < 1 << 24 ? 24 : 25) : (w < 1 << 26 ? 26 : 27))
-			: (w < 1 << 29 ? (w < 1 << 28 ? 28 : 29) : (w < 1 << 30 ? 30 : 31)))));
+		return w < 1 << 15 ? w < 1 << 7
+			? w < 1 << 3 ? w < 1 << 1
+				? w < 1 << 0 ? w < 0 ? 32 : 0 : 1
+				: w < 1 << 2 ? 2 : 3 : w < 1 << 5
+				? w < 1 << 4 ? 4 : 5
+				: w < 1 << 6 ? 6 : 7
+			: w < 1 << 11
+				? w < 1 << 9 ? w < 1 << 8 ? 8 : 9 : w < 1 << 10 ? 10 : 11
+				: w < 1 << 13 ? w < 1 << 12 ? 12 : 13 : w < 1 << 14 ? 14 : 15 : w < 1 << 23 ? w < 1 << 19
+			? w < 1 << 17 ? w < 1 << 16 ? 16 : 17 : w < 1 << 18 ? 18 : 19
+			: w < 1 << 21 ? w < 1 << 20 ? 20 : 21 : w < 1 << 22 ? 22 : 23 : w < 1 << 27
+			? w < 1 << 25 ? w < 1 << 24 ? 24 : 25 : w < 1 << 26 ? 26 : 27
+			: w < 1 << 29 ? w < 1 << 28 ? 28 : 29 : w < 1 << 30 ? 30 : 31;
 	}
 
 	private bool QuickPow2Check()
 	{
-		return m_sign > 0 && m_numBits == 1;
+		return _sign > 0 && _numBits == 1;
 	}
 
 	public int CompareTo(
@@ -633,7 +634,7 @@ internal class NetBigInteger
 		return CompareTo((NetBigInteger)obj);
 	}
 
-		
+
 	// unsigned comparison on two arrays - note the arrays may
 	// start with leading zeros.
 	private static int CompareTo(
@@ -661,7 +662,7 @@ internal class NetBigInteger
 		int yIndx,
 		int[] y)
 	{
-		var diff = (x.Length - y.Length) - (xIndx - yIndx);
+		var diff = x.Length - y.Length - (xIndx - yIndx);
 
 		if (diff != 0)
 		{
@@ -685,10 +686,10 @@ internal class NetBigInteger
 	public int CompareTo(
 		NetBigInteger value)
 	{
-		return m_sign < value.m_sign ? -1
-			: m_sign > value.m_sign ? 1
-			: m_sign == 0 ? 0
-			: m_sign * CompareNoLeadingZeroes(0, m_magnitude, 0, value.m_magnitude);
+		return _sign < value._sign ? -1
+			: _sign > value._sign ? 1
+			: _sign == 0 ? 0
+			: _sign * CompareNoLeadingZeroes(0, _magnitude, 0, value._magnitude);
 	}
 
 	// return z = x / y - done in place (z value preserved, x contains the remainder)
@@ -715,8 +716,8 @@ internal class NetBigInteger
 
 		if (xyCmp > 0)
 		{
-			var yBitLength = calcBitLength(yStart, y);
-			var xBitLength = calcBitLength(xStart, x);
+			var yBitLength = CalcBitLength(yStart, y);
+			var xBitLength = CalcBitLength(xStart, x);
 			var shift = xBitLength - yBitLength;
 
 			int[] iCount;
@@ -750,7 +751,7 @@ internal class NetBigInteger
 				if (cBitLength < xBitLength
 				    || CompareNoLeadingZeroes(xStart, x, cStart, c) >= 0)
 				{
-					Subtract(xStart, x, cStart, c);
+					Subtract(x, cStart, c);
 					AddMagnitudes(count, iCount);
 
 					while (x[xStart] == 0)
@@ -817,7 +818,7 @@ internal class NetBigInteger
 
 		if (xyCmp == 0)
 		{
-			AddMagnitudes(count, One.m_magnitude);
+			AddMagnitudes(count, One._magnitude);
 			Array.Clear(x, xStart, x.Length - xStart);
 		}
 
@@ -827,32 +828,32 @@ internal class NetBigInteger
 	public NetBigInteger Divide(
 		NetBigInteger val)
 	{
-		if (val.m_sign == 0)
+		if (val._sign == 0)
 			throw new ArithmeticException("Division by zero error");
 
-		if (m_sign == 0)
+		if (_sign == 0)
 			return Zero;
 
 		if (val.QuickPow2Check()) // val is power of two
 		{
 			var result = Abs().ShiftRight(val.Abs().BitLength - 1);
-			return val.m_sign == m_sign ? result : result.Negate();
+			return val._sign == _sign ? result : result.Negate();
 		}
 
-		var mag = (int[])m_magnitude.Clone();
+		var mag = (int[])_magnitude.Clone();
 
-		return new NetBigInteger(m_sign * val.m_sign, Divide(mag, val.m_magnitude), true);
+		return new NetBigInteger(_sign * val._sign, Divide(mag, val._magnitude), true);
 	}
 
 	public NetBigInteger[] DivideAndRemainder(
 		NetBigInteger val)
 	{
-		if (val.m_sign == 0)
+		if (val._sign == 0)
 			throw new ArithmeticException("Division by zero error");
 
 		var biggies = new NetBigInteger[2];
 
-		if (m_sign == 0)
+		if (_sign == 0)
 		{
 			biggies[0] = Zero;
 			biggies[1] = Zero;
@@ -863,16 +864,16 @@ internal class NetBigInteger
 			var quotient = Abs().ShiftRight(e);
 			var remainder = LastNBits(e);
 
-			biggies[0] = val.m_sign == m_sign ? quotient : quotient.Negate();
-			biggies[1] = new NetBigInteger(m_sign, remainder, true);
+			biggies[0] = val._sign == _sign ? quotient : quotient.Negate();
+			biggies[1] = new NetBigInteger(_sign, remainder, true);
 		}
 		else
 		{
-			var remainder = (int[])m_magnitude.Clone();
-			var quotient = Divide(remainder, val.m_magnitude);
+			var remainder = (int[])_magnitude.Clone();
+			var quotient = Divide(remainder, val._magnitude);
 
-			biggies[0] = new NetBigInteger(m_sign * val.m_sign, quotient, true);
-			biggies[1] = new NetBigInteger(m_sign, remainder, true);
+			biggies[0] = new NetBigInteger(_sign * val._sign, quotient, true);
+			biggies[1] = new NetBigInteger(_sign, remainder, true);
 		}
 
 		return biggies;
@@ -888,12 +889,12 @@ internal class NetBigInteger
 		if (biggie == null)
 			return false;
 
-		if (biggie.m_sign != m_sign || biggie.m_magnitude.Length != m_magnitude.Length)
+		if (biggie._sign != _sign || biggie._magnitude.Length != _magnitude.Length)
 			return false;
 
-		for (var i = 0; i < m_magnitude.Length; i++)
+		for (var i = 0; i < _magnitude.Length; i++)
 		{
-			if (biggie.m_magnitude[i] != m_magnitude[i])
+			if (biggie._magnitude[i] != _magnitude[i])
 			{
 				return false;
 			}
@@ -905,17 +906,17 @@ internal class NetBigInteger
 	public NetBigInteger Gcd(
 		NetBigInteger value)
 	{
-		if (value.m_sign == 0)
+		if (value._sign == 0)
 			return Abs();
 
-		if (m_sign == 0)
+		if (_sign == 0)
 			return value.Abs();
 
 		NetBigInteger r;
 		var u = this;
 		var v = value;
 
-		while (v.m_sign != 0)
+		while (v._sign != 0)
 		{
 			r = u.Mod(v);
 			u = v;
@@ -925,43 +926,39 @@ internal class NetBigInteger
 		return u;
 	}
 
+	[SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
 	public override int GetHashCode()
 	{
-		var hc = m_magnitude.Length;
-		if (m_magnitude.Length > 0)
+		var hc = _magnitude.Length;
+		if (_magnitude.Length > 0)
 		{
-			hc ^= m_magnitude[0];
+			hc ^= _magnitude[0];
 
-			if (m_magnitude.Length > 1)
+			if (_magnitude.Length > 1)
 			{
-				hc ^= m_magnitude[m_magnitude.Length - 1];
+				hc ^= _magnitude[^1];
 			}
 		}
 
-		return m_sign < 0 ? ~hc : hc;
+		return _sign < 0 ? ~hc : hc;
 	}
 
 	private NetBigInteger Inc()
 	{
-		if (m_sign == 0)
+		if (_sign == 0)
 			return One;
 
-		if (m_sign < 0)
-			return new NetBigInteger(-1, doSubBigLil(m_magnitude, One.m_magnitude), true);
+		if (_sign < 0)
+			return new NetBigInteger(-1, DoSubBigLil(_magnitude, One._magnitude), true);
 
-		return AddToMagnitude(One.m_magnitude);
+		return AddToMagnitude(One._magnitude);
 	}
 
-	public int IntValue
-	{
-		get
-		{
-			return m_sign == 0 ? 0
-				: m_sign > 0 ? m_magnitude[m_magnitude.Length - 1]
-				: -m_magnitude[m_magnitude.Length - 1];
-		}
-	}
-	
+	public int IntValue =>
+		_sign == 0 ? 0
+		: _sign > 0 ? _magnitude[^1]
+		: -_magnitude[^1];
+
 	public NetBigInteger Max(
 		NetBigInteger value)
 	{
@@ -977,18 +974,18 @@ internal class NetBigInteger
 	public NetBigInteger Mod(
 		NetBigInteger m)
 	{
-		if (m.m_sign < 1)
+		if (m._sign < 1)
 			throw new ArithmeticException("Modulus must be positive");
 
 		var biggie = Remainder(m);
 
-		return (biggie.m_sign >= 0 ? biggie : biggie.Add(m));
+		return biggie._sign >= 0 ? biggie : biggie.Add(m);
 	}
 
 	public NetBigInteger ModInverse(
 		NetBigInteger m)
 	{
-		if (m.m_sign < 1)
+		if (m._sign < 1)
 			throw new ArithmeticException("Modulus must be positive");
 
 		var x = new NetBigInteger();
@@ -997,11 +994,11 @@ internal class NetBigInteger
 		if (!gcd.Equals(One))
 			throw new ArithmeticException("Numbers not relatively prime.");
 
-		if (x.m_sign < 0)
+		if (x._sign < 0)
 		{
-			x.m_sign = 1;
+			x._sign = 1;
 			//x = m.Subtract(x);
-			x.m_magnitude = doSubBigLil(m.m_magnitude, x.m_magnitude);
+			x._magnitude = DoSubBigLil(m._magnitude, x._magnitude);
 		}
 
 		return x;
@@ -1018,7 +1015,7 @@ internal class NetBigInteger
 		var v1 = Zero;
 		var v3 = b;
 
-		while (v3.m_sign > 0)
+		while (v3._sign > 0)
 		{
 			var q = u3.DivideAndRemainder(v3);
 
@@ -1033,8 +1030,8 @@ internal class NetBigInteger
 
 		if (u1Out != null)
 		{
-			u1Out.m_sign = u1.m_sign;
-			u1Out.m_magnitude = u1.m_magnitude;
+			u1Out._sign = u1._sign;
+			u1Out._magnitude = u1._magnitude;
 		}
 
 		if (u2Out != null)
@@ -1042,8 +1039,8 @@ internal class NetBigInteger
 			var tmp = u1.Multiply(a);
 			tmp = u3.Subtract(tmp);
 			var res = tmp.Divide(b);
-			u2Out.m_sign = res.m_sign;
-			u2Out.m_magnitude = res.m_magnitude;
+			u2Out._sign = res._sign;
+			u2Out._magnitude = res._magnitude;
 		}
 
 		return u3;
@@ -1059,16 +1056,16 @@ internal class NetBigInteger
 		NetBigInteger exponent,
 		NetBigInteger m)
 	{
-		if (m.m_sign < 1)
+		if (m._sign < 1)
 			throw new ArithmeticException("Modulus must be positive");
 
 		if (m.Equals(One))
 			return Zero;
 
-		if (exponent.m_sign == 0)
+		if (exponent._sign == 0)
 			return One;
 
-		if (m_sign == 0)
+		if (_sign == 0)
 			return Zero;
 
 		int[] zVal = null;
@@ -1077,24 +1074,24 @@ internal class NetBigInteger
 
 		// Montgomery exponentiation is only possible if the modulus is odd,
 		// but AFAIK, this is always the case for crypto algo's
-		var useMonty = ((m.m_magnitude[m.m_magnitude.Length - 1] & 1) == 1);
+		var useMonty = (m._magnitude[^1] & 1) == 1;
 		long mQ = 0;
 		if (useMonty)
 		{
 			mQ = m.GetMQuote();
 
 			// tmp = this * R mod m
-			var tmp = ShiftLeft(32 * m.m_magnitude.Length).Mod(m);
-			zVal = tmp.m_magnitude;
+			var tmp = ShiftLeft(32 * m._magnitude.Length).Mod(m);
+			zVal = tmp._magnitude;
 
-			useMonty = (zVal.Length <= m.m_magnitude.Length);
+			useMonty = zVal.Length <= m._magnitude.Length;
 
 			if (useMonty)
 			{
-				yAccum = new int[m.m_magnitude.Length + 1];
-				if (zVal.Length < m.m_magnitude.Length)
+				yAccum = new int[m._magnitude.Length + 1];
+				if (zVal.Length < m._magnitude.Length)
 				{
-					var longZ = new int[m.m_magnitude.Length];
+					var longZ = new int[m._magnitude.Length];
 					zVal.CopyTo(longZ, longZ.Length - zVal.Length);
 					zVal = longZ;
 				}
@@ -1103,11 +1100,11 @@ internal class NetBigInteger
 
 		if (!useMonty)
 		{
-			if (m_magnitude.Length <= m.m_magnitude.Length)
+			if (_magnitude.Length <= m._magnitude.Length)
 			{
 				//zAccum = new int[m.magnitude.Length * 2];
-				zVal = new int[m.m_magnitude.Length];
-				m_magnitude.CopyTo(zVal, zVal.Length - m_magnitude.Length);
+				zVal = new int[m._magnitude.Length];
+				_magnitude.CopyTo(zVal, zVal.Length - _magnitude.Length);
 			}
 			else
 			{
@@ -1117,21 +1114,21 @@ internal class NetBigInteger
 				var tmp = Remainder(m);
 
 				//zAccum = new int[m.magnitude.Length * 2];
-				zVal = new int[m.m_magnitude.Length];
-				tmp.m_magnitude.CopyTo(zVal, zVal.Length - tmp.m_magnitude.Length);
+				zVal = new int[m._magnitude.Length];
+				tmp._magnitude.CopyTo(zVal, zVal.Length - tmp._magnitude.Length);
 			}
 
-			yAccum = new int[m.m_magnitude.Length * 2];
+			yAccum = new int[m._magnitude.Length * 2];
 		}
 
-		yVal = new int[m.m_magnitude.Length];
+		yVal = new int[m._magnitude.Length];
 
 		//
 		// from LSW to MSW
 		//
-		for (var i = 0; i < exponent.m_magnitude.Length; i++)
+		for (var i = 0; i < exponent._magnitude.Length; i++)
 		{
-			var v = exponent.m_magnitude[i];
+			var v = exponent._magnitude[i];
 			var bits = 0;
 
 			if (i == 0)
@@ -1158,12 +1155,12 @@ internal class NetBigInteger
 					// Montgomery square algo doesn't exist, and a normal
 					// square followed by a Montgomery reduction proved to
 					// be almost as heavy as a Montgomery mulitply.
-					MultiplyMonty(yAccum, yVal, yVal, m.m_magnitude, mQ);
+					MultiplyMonty(yAccum, yVal, yVal, m._magnitude, mQ);
 				}
 				else
 				{
 					Square(yAccum, yVal);
-					Remainder(yAccum, m.m_magnitude);
+					Remainder(yAccum, m._magnitude);
 					Array.Copy(yAccum, yAccum.Length - yVal.Length, yVal, 0, yVal.Length);
 					ZeroOut(yAccum);
 				}
@@ -1173,12 +1170,12 @@ internal class NetBigInteger
 				{
 					if (useMonty)
 					{
-						MultiplyMonty(yAccum, yVal, zVal, m.m_magnitude, mQ);
+						MultiplyMonty(yAccum, yVal, zVal, m._magnitude, mQ);
 					}
 					else
 					{
 						Multiply(yAccum, yVal, zVal);
-						Remainder(yAccum, m.m_magnitude);
+						Remainder(yAccum, m._magnitude);
 						Array.Copy(yAccum, yAccum.Length - yVal.Length, yVal, 0,
 							yVal.Length);
 						ZeroOut(yAccum);
@@ -1192,12 +1189,12 @@ internal class NetBigInteger
 			{
 				if (useMonty)
 				{
-					MultiplyMonty(yAccum, yVal, yVal, m.m_magnitude, mQ);
+					MultiplyMonty(yAccum, yVal, yVal, m._magnitude, mQ);
 				}
 				else
 				{
 					Square(yAccum, yVal);
-					Remainder(yAccum, m.m_magnitude);
+					Remainder(yAccum, m._magnitude);
 					Array.Copy(yAccum, yAccum.Length - yVal.Length, yVal, 0, yVal.Length);
 					ZeroOut(yAccum);
 				}
@@ -1209,20 +1206,19 @@ internal class NetBigInteger
 		{
 			// Return y * R^(-1) mod m by doing y * 1 * R^(-1) mod m
 			ZeroOut(zVal);
-			zVal[zVal.Length - 1] = 1;
-			MultiplyMonty(yAccum, yVal, zVal, m.m_magnitude, mQ);
+			zVal[^1] = 1;
+			MultiplyMonty(yAccum, yVal, zVal, m._magnitude, mQ);
 		}
 
 		var result = new NetBigInteger(1, yVal, true);
 
-		return exponent.m_sign > 0
+		return exponent._sign > 0
 			? result
 			: result.ModInverse(m);
 	}
 
 	// return w with w = x * x - w is assumed to have enough space.
-	private static int[] Square(
-		int[] w,
+	private static void Square(int[] w,
 		int[] x)
 	{
 		// Note: this method allows w to be only (2 * x.Length - 1) words if result will fit
@@ -1241,7 +1237,7 @@ internal class NetBigInteger
 			u2 = u1 >> 32;
 			u1 = (uint)u1;
 
-			u1 += (ulong)(uint)w[wBase];
+			u1 += (uint)w[wBase];
 
 			w[wBase] = (int)(uint)u1;
 			c = u2 + (u1 >> 32);
@@ -1249,16 +1245,16 @@ internal class NetBigInteger
 			for (var j = i - 1; j >= 0; j--)
 			{
 				--wBase;
-				u1 = v * (ulong)(uint)x[j];
+				u1 = v * (uint)x[j];
 				u2 = u1 >> 31; // multiply by 2!
 				u1 = (uint)(u1 << 1); // multiply by 2!
-				u1 += c + (ulong)(uint)w[wBase];
+				u1 += c + (uint)w[wBase];
 
 				w[wBase] = (int)(uint)u1;
 				c = u2 + (u1 >> 32);
 			}
 
-			c += (ulong)(uint)w[--wBase];
+			c += (uint)w[--wBase];
 			w[wBase] = (int)(uint)c;
 
 			if (--wBase >= 0)
@@ -1272,51 +1268,47 @@ internal class NetBigInteger
 			wBase += i;
 		}
 
-		u1 = (ulong)(uint)x[0];
+		u1 = (uint)x[0];
 		u1 = u1 * u1;
 		u2 = u1 >> 32;
-		u1 = u1 & IMASK;
+		u1 = u1 & Imask;
 
-		u1 += (ulong)(uint)w[wBase];
+		u1 += (uint)w[wBase];
 
 		w[wBase] = (int)(uint)u1;
 		if (--wBase >= 0)
 		{
-			w[wBase] = (int)(uint)(u2 + (u1 >> 32) + (ulong)(uint)w[wBase]);
+			w[wBase] = (int)(uint)(u2 + (u1 >> 32) + (uint)w[wBase]);
 		}
 		else
 		{
 			Debug.Assert((uint)(u2 + (u1 >> 32)) == 0);
 		}
-
-		return w;
 	}
 
 	// return x with x = y * z - x is assumed to have enough space.
-	private static int[] Multiply(
-		int[] x,
+	private static void Multiply(int[] x,
 		int[] y,
 		int[] z)
 	{
 		var i = z.Length;
 
-		if (i < 1)
-			return x;
+		if (i < 1) return;
 
 		var xBase = x.Length - y.Length;
 
 		for (; ; )
 		{
-			var a = z[--i] & IMASK;
+			var a = z[--i] & Imask;
 			long val = 0;
 
 			for (var j = y.Length - 1; j >= 0; j--)
 			{
-				val += a * (y[j] & IMASK) + (x[xBase + j] & IMASK);
+				val += a * (y[j] & Imask) + (x[xBase + j] & Imask);
 
 				x[xBase + j] = (int)val;
 
-				val = (long)((ulong)val >> 32);
+				val >>>= 32;
 			}
 
 			--xBase;
@@ -1336,8 +1328,6 @@ internal class NetBigInteger
 
 			x[xBase] = (int)val;
 		}
-
-		return x;
 	}
 
 	private static long FastExtEuclid(
@@ -1352,21 +1342,19 @@ internal class NetBigInteger
 
 		while (v3 > 0)
 		{
-			long q, tn;
+			var q = u3 / v3;
 
-			q = u3 / v3;
-
-			tn = u1 - (v1 * q);
+			var tn = u1 - v1 * q;
 			u1 = v1;
 			v1 = tn;
 
-			tn = u3 - (v3 * q);
+			tn = u3 - v3 * q;
 			u3 = v3;
 			v3 = tn;
 		}
 
 		uOut[0] = u1;
-		uOut[1] = (u3 - (u1 * a)) / b;
+		uOut[1] = (u3 - u1 * a) / b;
 
 		return u3;
 	}
@@ -1394,22 +1382,22 @@ internal class NetBigInteger
 
 	private long GetMQuote()
 	{
-		Debug.Assert(m_sign > 0);
+		Debug.Assert(_sign > 0);
 
-		if (m_quote != -1)
+		if (_quote != -1)
 		{
-			return m_quote; // already calculated
+			return _quote; // already calculated
 		}
 
-		if (m_magnitude.Length == 0 || (m_magnitude[m_magnitude.Length - 1] & 1) == 0)
+		if (_magnitude.Length == 0 || (_magnitude[^1] & 1) == 0)
 		{
 			return -1; // not for even numbers
 		}
 
-		var v = (((~m_magnitude[m_magnitude.Length - 1]) | 1) & 0xffffffffL);
-		m_quote = FastModInverse(v, 0x100000000L);
+		var v = (~_magnitude[^1] | 1) & 0xffffffffL;
+		_quote = FastModInverse(v, 0x100000000L);
 
-		return m_quote;
+		return _quote;
 	}
 
 	private static void MultiplyMonty(
@@ -1428,7 +1416,7 @@ internal class NetBigInteger
 
 		var n = m.Length;
 		var nMinus1 = n - 1;
-		var y_0 = y[nMinus1] & IMASK;
+		var y0 = y[nMinus1] & Imask;
 
 		// 1. a = 0 (Notation: a = (a_{n} a_{n-1} ... a_{0})_{b} )
 		Array.Clear(a, 0, n + 1);
@@ -1436,26 +1424,26 @@ internal class NetBigInteger
 		// 2. for i from 0 to (n - 1) do the following:
 		for (var i = n; i > 0; i--)
 		{
-			var x_i = x[i - 1] & IMASK;
+			var xi = x[i - 1] & Imask;
 
 			// 2.1 u = ((a[0] + (x[i] * y[0]) * mQuote) mod b
-			var u = ((((a[n] & IMASK) + ((x_i * y_0) & IMASK)) & IMASK) * mQuote) & IMASK;
+			var u = ((((a[n] & Imask) + ((xi * y0) & Imask)) & Imask) * mQuote) & Imask;
 
 			// 2.2 a = (a + x_i * y + u * m) / b
-			var prod1 = x_i * y_0;
-			var prod2 = u * (m[nMinus1] & IMASK);
-			var tmp = (a[n] & IMASK) + (prod1 & IMASK) + (prod2 & IMASK);
-			var carry = (long)((ulong)prod1 >> 32) + (long)((ulong)prod2 >> 32) + (long)((ulong)tmp >> 32);
+			var prod1 = xi * y0;
+			var prod2 = u * (m[nMinus1] & Imask);
+			var tmp = (a[n] & Imask) + (prod1 & Imask) + (prod2 & Imask);
+			var carry = (prod1 >>> 32) + (prod2 >>> 32) + (tmp >>> 32);
 			for (var j = nMinus1; j > 0; j--)
 			{
-				prod1 = x_i * (y[j - 1] & IMASK);
-				prod2 = u * (m[j - 1] & IMASK);
-				tmp = (a[j] & IMASK) + (prod1 & IMASK) + (prod2 & IMASK) + (carry & IMASK);
-				carry = (long)((ulong)carry >> 32) + (long)((ulong)prod1 >> 32) +
-				        (long)((ulong)prod2 >> 32) + (long)((ulong)tmp >> 32);
+				prod1 = xi * (y[j - 1] & Imask);
+				prod2 = u * (m[j - 1] & Imask);
+				tmp = (a[j] & Imask) + (prod1 & Imask) + (prod2 & Imask) + (carry & Imask);
+				carry = (carry >>> 32) + (prod1 >>> 32) +
+				        (prod2 >>> 32) + (tmp >>> 32);
 				a[j + 1] = (int)tmp; // division by b
 			}
-			carry += (a[0] & IMASK);
+			carry += a[0] & Imask;
 			a[1] = (int)carry;
 			a[0] = (int)((ulong)carry >> 32); // OJO!!!!!
 		}
@@ -1463,7 +1451,7 @@ internal class NetBigInteger
 		// 3. if x >= m the x = x - m
 		if (CompareTo(0, a, 0, m) >= 0)
 		{
-			Subtract(0, a, 0, m);
+			Subtract(a, 0, m);
 		}
 
 		// put the result in x
@@ -1477,10 +1465,10 @@ internal class NetBigInteger
 		ulong mQuote)
 	{
 		ulong um = m;
-		var prod1 = (ulong)x * (ulong)y;
-		var u = (prod1 * mQuote) & UIMASK;
+		var prod1 = x * (ulong)y;
+		var u = (prod1 * mQuote) & UImask;
 		var prod2 = u * um;
-		var tmp = (prod1 & UIMASK) + (prod2 & UIMASK);
+		var tmp = (prod1 & UImask) + (prod2 & UImask);
 		var carry = (prod1 >> 32) + (prod2 >> 32) + (tmp >> 32);
 
 		if (carry > um)
@@ -1488,7 +1476,7 @@ internal class NetBigInteger
 			carry -= um;
 		}
 
-		return (uint)(carry & UIMASK);
+		return (uint)(carry & UImask);
 	}
 
 	public NetBigInteger Modulus(
@@ -1500,19 +1488,19 @@ internal class NetBigInteger
 	public NetBigInteger Multiply(
 		NetBigInteger val)
 	{
-		if (m_sign == 0 || val.m_sign == 0)
+		if (_sign == 0 || val._sign == 0)
 			return Zero;
 
 		if (val.QuickPow2Check()) // val is power of two
 		{
 			var result = ShiftLeft(val.Abs().BitLength - 1);
-			return val.m_sign > 0 ? result : result.Negate();
+			return val._sign > 0 ? result : result.Negate();
 		}
 
 		if (QuickPow2Check()) // this is power of two
 		{
 			var result = val.ShiftLeft(Abs().BitLength - 1);
-			return m_sign > 0 ? result : result.Negate();
+			return _sign > 0 ? result : result.Negate();
 		}
 
 		var maxBitLength = BitLength + val.BitLength;
@@ -1520,24 +1508,24 @@ internal class NetBigInteger
 
 		var res = new int[resLength];
 
-		if (val == this)
+		if (ReferenceEquals(val, this))
 		{
-			Square(res, m_magnitude);
+			Square(res, _magnitude);
 		}
 		else
 		{
-			Multiply(res, m_magnitude, val.m_magnitude);
+			Multiply(res, _magnitude, val._magnitude);
 		}
 
-		return new NetBigInteger(m_sign * val.m_sign, res, true);
+		return new NetBigInteger(_sign * val._sign, res, true);
 	}
 
 	public NetBigInteger Negate()
 	{
-		if (m_sign == 0)
+		if (_sign == 0)
 			return this;
 
-		return new NetBigInteger(-m_sign, m_magnitude, false);
+		return new NetBigInteger(-_sign, _magnitude, false);
 	}
 
 	public NetBigInteger Not()
@@ -1557,7 +1545,7 @@ internal class NetBigInteger
 			return One;
 		}
 
-		if (m_sign == 0 || Equals(One))
+		if (_sign == 0 || Equals(One))
 		{
 			return this;
 		}
@@ -1578,16 +1566,16 @@ internal class NetBigInteger
 
 		return y;
 	}
-		
+
 	private int Remainder(
 		int m)
 	{
 		Debug.Assert(m > 0);
 
 		long acc = 0;
-		for (var pos = 0; pos < m_magnitude.Length; ++pos)
+		for (var pos = 0; pos < _magnitude.Length; ++pos)
 		{
-			long posVal = (uint)m_magnitude[pos];
+			long posVal = (uint)_magnitude[pos];
 			acc = (acc << 32 | posVal) % m;
 		}
 
@@ -1617,8 +1605,8 @@ internal class NetBigInteger
 
 		if (xyCmp > 0)
 		{
-			var yBitLength = calcBitLength(yStart, y);
-			var xBitLength = calcBitLength(xStart, x);
+			var yBitLength = CalcBitLength(yStart, y);
+			var xBitLength = CalcBitLength(xStart, x);
 			var shift = xBitLength - yBitLength;
 
 			int[] c;
@@ -1642,7 +1630,7 @@ internal class NetBigInteger
 				if (cBitLength < xBitLength
 				    || CompareNoLeadingZeroes(xStart, x, cStart, c) >= 0)
 				{
-					Subtract(xStart, x, cStart, c);
+					Subtract(x, cStart, c);
 
 					while (x[xStart] == 0)
 					{
@@ -1706,16 +1694,16 @@ internal class NetBigInteger
 	public NetBigInteger Remainder(
 		NetBigInteger n)
 	{
-		if (n.m_sign == 0)
+		if (n._sign == 0)
 			throw new ArithmeticException("Division by zero error");
 
-		if (m_sign == 0)
+		if (_sign == 0)
 			return Zero;
 
 		// For small values, use fast remainder method
-		if (n.m_magnitude.Length == 1)
+		if (n._magnitude.Length == 1)
 		{
-			var val = n.m_magnitude[0];
+			var val = n._magnitude[0];
 
 			if (val > 0)
 			{
@@ -1726,11 +1714,11 @@ internal class NetBigInteger
 
 				return rem == 0
 					? Zero
-					: new NetBigInteger(m_sign, [rem], false);
+					: new NetBigInteger(_sign, [rem], false);
 			}
 		}
 
-		if (CompareNoLeadingZeroes(0, m_magnitude, 0, n.m_magnitude) < 0)
+		if (CompareNoLeadingZeroes(0, _magnitude, 0, n._magnitude) < 0)
 			return this;
 
 		int[] result;
@@ -1740,11 +1728,11 @@ internal class NetBigInteger
 		}
 		else
 		{
-			result = (int[])m_magnitude.Clone();
-			result = Remainder(result, n.m_magnitude);
+			result = (int[])_magnitude.Clone();
+			result = Remainder(result, n._magnitude);
 		}
 
-		return new NetBigInteger(m_sign, result, true);
+		return new NetBigInteger(_sign, result, true);
 	}
 
 	private int[] LastNBits(
@@ -1754,10 +1742,10 @@ internal class NetBigInteger
 			return ZeroMagnitude;
 
 		var numWords = (n + BitsPerInt - 1) / BitsPerInt;
-		numWords = System.Math.Min(numWords, m_magnitude.Length);
+		numWords = Math.Min(numWords, _magnitude.Length);
 		var result = new int[numWords];
 
-		Array.Copy(m_magnitude, m_magnitude.Length - numWords, result, 0, numWords);
+		Array.Copy(_magnitude, _magnitude.Length - numWords, result, 0, numWords);
 
 		var hiBits = n % 32;
 		if (hiBits != 0)
@@ -1774,7 +1762,7 @@ internal class NetBigInteger
 		int[] mag,
 		int n)
 	{
-		var nInts = (int)((uint)n >> 5);
+		var nInts = n >>> 5;
 		var nBits = n & 0x1f;
 		var magLen = mag.Length;
 		int[] newMag;
@@ -1788,7 +1776,7 @@ internal class NetBigInteger
 		{
 			var i = 0;
 			var nBits2 = 32 - nBits;
-			var highBits = (int)((uint)mag[0] >> nBits2);
+			var highBits = mag[0] >>> nBits2;
 
 			if (highBits != 0)
 			{
@@ -1805,7 +1793,7 @@ internal class NetBigInteger
 			{
 				var next = mag[j + 1];
 
-				newMag[i++] = (m << nBits) | (int)((uint)next >> nBits2);
+				newMag[i++] = (m << nBits) | next >>> nBits2;
 				m = next;
 			}
 
@@ -1818,7 +1806,7 @@ internal class NetBigInteger
 	public NetBigInteger ShiftLeft(
 		int n)
 	{
-		if (m_sign == 0 || m_magnitude.Length == 0)
+		if (_sign == 0 || _magnitude.Length == 0)
 			return Zero;
 
 		if (n == 0)
@@ -1827,18 +1815,18 @@ internal class NetBigInteger
 		if (n < 0)
 			return ShiftRight(-n);
 
-		var result = new NetBigInteger(m_sign, ShiftLeft(m_magnitude, n), true);
+		var result = new NetBigInteger(_sign, ShiftLeft(_magnitude, n), true);
 
-		if (m_numBits != -1)
+		if (_numBits != -1)
 		{
-			result.m_numBits = m_sign > 0
-				? m_numBits
-				: m_numBits + n;
+			result._numBits = _sign > 0
+				? _numBits
+				: _numBits + n;
 		}
 
-		if (m_numBitLength != -1)
+		if (_numBitLength != -1)
 		{
-			result.m_numBitLength = m_numBitLength + n;
+			result._numBitLength = _numBitLength + n;
 		}
 
 		return result;
@@ -1850,13 +1838,13 @@ internal class NetBigInteger
 		int[] mag,
 		int n)
 	{
-		var nInts = (int)((uint)n >> 5) + start;
+		var nInts = (n >>> 5) + start;
 		var nBits = n & 0x1f;
 		var magEnd = mag.Length - 1;
 
 		if (nInts != start)
 		{
-			var delta = (nInts - start);
+			var delta = nInts - start;
 
 			for (var i = magEnd; i >= nInts; i--)
 			{
@@ -1877,11 +1865,11 @@ internal class NetBigInteger
 			{
 				var next = mag[i - 1];
 
-				mag[i] = (int)((uint)m >> nBits) | (next << nBits2);
+				mag[i] = m >>> nBits | (next << nBits2);
 				m = next;
 			}
 
-			mag[nInts] = (int)((uint)mag[nInts] >> nBits);
+			mag[nInts] = mag[nInts] >>> nBits;
 		}
 
 		return mag;
@@ -1898,11 +1886,11 @@ internal class NetBigInteger
 		while (--i > start)
 		{
 			var next = mag[i - 1];
-			mag[i] = ((int)((uint)m >> 1)) | (next << 31);
+			mag[i] = m >>> 1 | (next << 31);
 			m = next;
 		}
 
-		mag[start] = (int)((uint)mag[start] >> 1);
+		mag[start] = mag[start] >>> 1;
 
 		return mag;
 	}
@@ -1917,7 +1905,7 @@ internal class NetBigInteger
 			return ShiftLeft(-n);
 
 		if (n >= BitLength)
-			return (m_sign < 0 ? One.Negate() : Zero);
+			return _sign < 0 ? One.Negate() : Zero;
 
 		//			int[] res = (int[]) magnitude.Clone();
 		//
@@ -1933,52 +1921,46 @@ internal class NetBigInteger
 
 		if (numBits == 0)
 		{
-			Array.Copy(m_magnitude, 0, res, 0, res.Length);
+			Array.Copy(_magnitude, 0, res, 0, res.Length);
 		}
 		else
 		{
 			var numBits2 = 32 - numBits;
 
-			var magPos = m_magnitude.Length - 1 - numInts;
+			var magPos = _magnitude.Length - 1 - numInts;
 			for (var i = resultLength - 1; i >= 0; --i)
 			{
-				res[i] = (int)((uint)m_magnitude[magPos--] >> numBits);
+				res[i] = _magnitude[magPos--] >>> numBits;
 
 				if (magPos >= 0)
 				{
-					res[i] |= m_magnitude[magPos] << numBits2;
+					res[i] |= _magnitude[magPos] << numBits2;
 				}
 			}
 		}
 
 		Debug.Assert(res[0] != 0);
 
-		return new NetBigInteger(m_sign, res, false);
+		return new NetBigInteger(_sign, res, false);
 	}
 
-	public int SignValue
-	{
-		get { return m_sign; }
-	}
+	public int SignValue => _sign;
 
 	// returns x = x - y - we assume x is >= y
 	private static int[] Subtract(
-		int xStart,
 		int[] x,
 		int yStart,
 		int[] y)
 	{
 		Debug.Assert(yStart < y.Length);
-		Debug.Assert(x.Length - xStart >= y.Length - yStart);
 
 		var iT = x.Length;
 		var iV = y.Length;
-		long m;
 		var borrow = 0;
 
 		do
 		{
-			m = (x[--iT] & IMASK) - (y[--iV] & IMASK) + borrow;
+			var m = (x[--iT] & Imask) - (y[--iV] & Imask) + borrow;
 			x[iT] = (int)m;
 
 			//				borrow = (m < 0) ? -1 : 0;
@@ -1999,16 +1981,16 @@ internal class NetBigInteger
 	public NetBigInteger Subtract(
 		NetBigInteger n)
 	{
-		if (n.m_sign == 0)
+		if (n._sign == 0)
 			return this;
 
-		if (m_sign == 0)
+		if (_sign == 0)
 			return n.Negate();
 
-		if (m_sign != n.m_sign)
+		if (_sign != n._sign)
 			return Add(n.Negate());
 
-		var compare = CompareNoLeadingZeroes(0, m_magnitude, 0, n.m_magnitude);
+		var compare = CompareNoLeadingZeroes(0, _magnitude, 0, n._magnitude);
 		if (compare == 0)
 			return Zero;
 
@@ -2024,16 +2006,16 @@ internal class NetBigInteger
 			lilun = n;
 		}
 
-		return new NetBigInteger(m_sign * compare, doSubBigLil(bigun.m_magnitude, lilun.m_magnitude), true);
+		return new NetBigInteger(_sign * compare, DoSubBigLil(bigun._magnitude, lilun._magnitude), true);
 	}
 
-	private static int[] doSubBigLil(
+	private static int[] DoSubBigLil(
 		int[] bigMag,
 		int[] lilMag)
 	{
 		var res = (int[])bigMag.Clone();
 
-		return Subtract(0, res, 0, lilMag);
+		return Subtract(res, 0, lilMag);
 	}
 
 	public byte[] ToByteArray()
@@ -2049,33 +2031,34 @@ internal class NetBigInteger
 	private byte[] ToByteArray(
 		bool unsigned)
 	{
-		if (m_sign == 0)
+		if (_sign == 0)
 			return unsigned ? ZeroEncoding : new byte[1];
 
-		var nBits = (unsigned && m_sign > 0)
+		var nBits = unsigned && _sign > 0
 			? BitLength
 			: BitLength + 1;
 
 		var nBytes = GetByteLength(nBits);
 		var bytes = new byte[nBytes];
 
-		var magIndex = m_magnitude.Length;
+		var magIndex = _magnitude.Length;
 		var bytesIndex = bytes.Length;
 
-		if (m_sign > 0)
+		if (_sign > 0)
 		{
 			while (magIndex > 1)
 			{
-				var mag = (uint)m_magnitude[--magIndex];
+				var mag = (uint)_magnitude[--magIndex];
 				bytes[--bytesIndex] = (byte)mag;
 				bytes[--bytesIndex] = (byte)(mag >> 8);
 				bytes[--bytesIndex] = (byte)(mag >> 16);
 				bytes[--bytesIndex] = (byte)(mag >> 24);
 			}
 
-			var lastMag = (uint)m_magnitude[0];
+			var lastMag = (uint)_magnitude[0];
 			while (lastMag > byte.MaxValue)
 			{
+				// ReSharper disable once IntVariableOverflowInUncheckedContext
 				bytes[--bytesIndex] = (byte)lastMag;
 				lastMag >>= 8;
 			}
@@ -2088,11 +2071,11 @@ internal class NetBigInteger
 
 			while (magIndex > 1)
 			{
-				var mag = ~((uint)m_magnitude[--magIndex]);
+				var mag = ~(uint)_magnitude[--magIndex];
 
 				if (carry)
 				{
-					carry = (++mag == uint.MinValue);
+					carry = ++mag == uint.MinValue;
 				}
 
 				bytes[--bytesIndex] = (byte)mag;
@@ -2101,7 +2084,7 @@ internal class NetBigInteger
 				bytes[--bytesIndex] = (byte)(mag >> 24);
 			}
 
-			var lastMag = (uint)m_magnitude[0];
+			var lastMag = (uint)_magnitude[0];
 
 			if (carry)
 			{
@@ -2145,23 +2128,23 @@ internal class NetBigInteger
 		}
 
 		// NB: Can only happen to internally managed instances
-		if (m_magnitude == null)
+		if (_magnitude == null)
 			return "null";
 
-		if (m_sign == 0)
+		if (_sign == 0)
 			return "0";
 
-		Debug.Assert(m_magnitude.Length > 0);
+		Debug.Assert(_magnitude.Length > 0);
 
 		var sb = new StringBuilder();
 
 		if (radix == 16)
 		{
-			sb.Append(m_magnitude[0].ToString("x"));
+			sb.Append(_magnitude[0].ToString("x"));
 
-			for (var i = 1; i < m_magnitude.Length; i++)
+			for (var i = 1; i < _magnitude.Length; i++)
 			{
-				sb.Append(m_magnitude[i].ToString("x8"));
+				sb.Append(_magnitude[i].ToString("x8"));
 			}
 		}
 		else if (radix == 2)
@@ -2176,31 +2159,31 @@ internal class NetBigInteger
 		else
 		{
 			// This is algorithm 1a from chapter 4.4 in Seminumerical Algorithms, slow but it works
-			var S = new Stack();
+			var stack = new Stack();
 			var bs = ValueOf(radix);
 
 			var u = Abs();
 			NetBigInteger b;
 
-			while (u.m_sign != 0)
+			while (u._sign != 0)
 			{
 				b = u.Mod(bs);
-				if (b.m_sign == 0)
+				if (b._sign == 0)
 				{
-					S.Push("0");
+					stack.Push("0");
 				}
 				else
 				{
 					// see how to interact with different bases
-					S.Push(b.m_magnitude[0].ToString("d"));
+					stack.Push(b._magnitude[0].ToString("d"));
 				}
 				u = u.Divide(bs);
 			}
 
 			// Then pop the stack
-			while (S.Count != 0)
+			while (stack.Count != 0)
 			{
-				sb.Append((string)S.Pop());
+				sb.Append((string)stack.Pop());
 			}
 		}
 
@@ -2217,7 +2200,7 @@ internal class NetBigInteger
 			s = s.Substring(nonZeroPos);
 		}
 
-		if (m_sign == -1)
+		if (_sign == -1)
 		{
 			s = "-" + s;
 		}
@@ -2225,7 +2208,7 @@ internal class NetBigInteger
 		return s;
 	}
 
-	private static NetBigInteger createUValueOf(
+	private static NetBigInteger CreateUValueOf(
 		ulong value)
 	{
 		var msw = (int)(value >> 32);
@@ -2240,7 +2223,7 @@ internal class NetBigInteger
 			// Check for a power of two
 			if ((lsw & -lsw) == lsw)
 			{
-				n.m_numBits = 1;
+				n._numBits = 1;
 			}
 			return n;
 		}
@@ -2248,18 +2231,18 @@ internal class NetBigInteger
 		return Zero;
 	}
 
-	private static NetBigInteger createValueOf(
+	private static NetBigInteger CreateValueOf(
 		long value)
 	{
 		if (value < 0)
 		{
 			if (value == long.MinValue)
-				return createValueOf(~value).Not();
+				return CreateValueOf(~value).Not();
 
-			return createValueOf(-value).Negate();
+			return CreateValueOf(-value).Negate();
 		}
 
-		return createUValueOf((ulong)value);
+		return CreateUValueOf((ulong)value);
 	}
 
 	public static NetBigInteger ValueOf(
@@ -2279,23 +2262,23 @@ internal class NetBigInteger
 				return Ten;
 		}
 
-		return createValueOf(value);
+		return CreateValueOf(value);
 	}
 
 	public int GetLowestSetBit()
 	{
-		if (m_sign == 0)
+		if (_sign == 0)
 			return -1;
 
-		var w = m_magnitude.Length;
+		var w = _magnitude.Length;
 
 		while (--w > 0)
 		{
-			if (m_magnitude[w] != 0)
+			if (_magnitude[w] != 0)
 				break;
 		}
 
-		var word = (int)m_magnitude[w];
+		var word = _magnitude[w];
 		Debug.Assert(word != 0);
 
 		var b = (word & 0x0000FFFF) == 0
@@ -2308,13 +2291,13 @@ internal class NetBigInteger
 
 		while (b > 0)
 		{
-			if ((word << b) == int.MinValue)
+			if (word << b == int.MinValue)
 				break;
 
 			b--;
 		}
 
-		return ((m_magnitude.Length - w) * 32 - (b + 1));
+		return (_magnitude.Length - w) * 32 - (b + 1);
 	}
 
 	public bool TestBit(
@@ -2323,28 +2306,28 @@ internal class NetBigInteger
 		if (n < 0)
 			throw new ArithmeticException("Bit position must not be negative");
 
-		if (m_sign < 0)
+		if (_sign < 0)
 			return !Not().TestBit(n);
 
 		var wordNum = n / 32;
-		if (wordNum >= m_magnitude.Length)
+		if (wordNum >= _magnitude.Length)
 			return false;
 
-		var word = m_magnitude[m_magnitude.Length - 1 - wordNum];
+		var word = _magnitude[_magnitude.Length - 1 - wordNum];
 		return ((word >> (n % 32)) & 1) > 0;
 	}
 }
-	
+
 #if WINDOWS_RUNTIME
 	internal sealed class Stack
 	{
-		private System.Collections.Generic.List<object> m_list = new System.Collections.Generic.List<object>();
-		public int Count { get { return m_list.Count; } }
-		public void Push(object item) { m_list.Add(item); }
+		private System.Collections.Generic.List<object> _list = new System.Collections.Generic.List<object>();
+		public int Count { get { return _list.Count; } }
+		public void Push(object item) { _list.Add(item); }
 		public object Pop()
 		{
-			var item = m_list[m_list.Count - 1];
-			m_list.RemoveAt(m_list.Count - 1);
+			var item = _list[_list.Count - 1];
+			_list.RemoveAt(_list.Count - 1);
 			return item;
 		}
 	}

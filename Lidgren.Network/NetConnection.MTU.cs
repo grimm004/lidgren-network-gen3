@@ -1,179 +1,178 @@
 ﻿namespace Lidgren.Network;
 
-public partial class NetConnection  
+public partial class NetConnection
 {
-	private enum ExpandMTUStatus
+	private enum ExpandMtuStatus
 	{
 		None,
+		// ReSharper disable once UnusedMember.Local
 		InProgress,
 		Finished
 	}
 
-	private const int c_protocolMaxMTU = (int)((((float)ushort.MaxValue / 8.0f) - 1.0f));
+	private const int ProtocolMaxMtu = (int)(ushort.MaxValue / 8.0f - 1.0f);
 
-	private ExpandMTUStatus m_expandMTUStatus;
+	private ExpandMtuStatus _expandMtuStatus;
 
-	private int m_largestSuccessfulMTU;
-	private int m_smallestFailedMTU;
+	private int _largestSuccessfulMtu;
+	private int _smallestFailedMtu;
 
-	private int m_lastSentMTUAttemptSize;
-	private double m_lastSentMTUAttemptTime;
-	private int m_mtuAttemptFails;
+	private int _lastSentMtuAttemptSize;
+	private double _lastSentMtuAttemptTime;
+	private int _mtuAttemptFails;
 
-	internal int m_currentMTU;
+	internal int CurrentMtuValue;
 
 	/// <summary>
 	/// Gets the current MTU in bytes. If PeerConfiguration.AutoExpandMTU is false, this will be PeerConfiguration.MaximumTransmissionUnit.
 	/// </summary>
-	public int CurrentMTU { get { return m_currentMTU; } }
+	public int CurrentMtu => CurrentMtuValue;
 
-	internal void InitExpandMTU(double now)
+	internal void InitExpandMtu(double now)
 	{
-		m_lastSentMTUAttemptTime = now + m_peerConfiguration.m_expandMTUFrequency + 1.5f + m_averageRoundtripTime; // wait a tiny bit before starting to expand mtu
-		m_largestSuccessfulMTU = 512;
-		m_smallestFailedMTU = -1;
-		m_currentMTU = m_peerConfiguration.MaximumTransmissionUnit;
+		_lastSentMtuAttemptTime = now + PeerConfiguration.ExpandMtuFrequency + 1.5f + _averageRoundtripTime; // wait a tiny bit before starting to expand mtu
+		_largestSuccessfulMtu = 512;
+		_smallestFailedMtu = -1;
+		CurrentMtuValue = PeerConfiguration.MaximumTransmissionUnit;
 	}
 
-	private void MTUExpansionHeartbeat(double now)
+	private void MtuExpansionHeartbeat(double now)
 	{
-		if (m_expandMTUStatus == ExpandMTUStatus.Finished)
+		if (_expandMtuStatus == ExpandMtuStatus.Finished)
 			return;
 
-		if (m_expandMTUStatus == ExpandMTUStatus.None)
+		if (_expandMtuStatus == ExpandMtuStatus.None)
 		{
-			if (m_peerConfiguration.m_autoExpandMTU == false)
+			if (!PeerConfiguration.AutoExpandMtu)
 			{
-				FinalizeMTU(m_currentMTU);
+				FinalizeMtu(CurrentMtuValue);
 				return;
 			}
 
 			// begin expansion
-			ExpandMTU(now);
+			ExpandMtu(now);
 			return;
 		}
 
-		if (now > m_lastSentMTUAttemptTime + m_peerConfiguration.ExpandMTUFrequency)
+		if (now > _lastSentMtuAttemptTime + PeerConfiguration.ExpandMtuFrequency)
 		{
-			m_mtuAttemptFails++;
-			if (m_mtuAttemptFails == 3)
+			_mtuAttemptFails++;
+			if (_mtuAttemptFails == 3)
 			{
-				FinalizeMTU(m_currentMTU);
+				FinalizeMtu(CurrentMtuValue);
 				return;
 			}
 
 			// timed out; ie. failed
-			m_smallestFailedMTU = m_lastSentMTUAttemptSize;
-			ExpandMTU(now);
+			_smallestFailedMtu = _lastSentMtuAttemptSize;
+			ExpandMtu(now);
 		}
 	}
 
-	private void ExpandMTU(double now)
+	private void ExpandMtu(double now)
 	{
-		int tryMTU;
+		int tryMtu;
 
 		// we've nevered encountered failure
-		if (m_smallestFailedMTU == -1)
+		if (_smallestFailedMtu == -1)
 		{
 			// we've never encountered failure; expand by 25% each time
-			tryMTU = (int)((float)m_currentMTU * 1.25f);
+			tryMtu = (int)(CurrentMtuValue * 1.25f);
 			//m_peer.LogDebug("Trying MTU " + tryMTU);
 		}
 		else
 		{
 			// we HAVE encountered failure; so try in between
-			tryMTU = (int)(((float)m_smallestFailedMTU + (float)m_largestSuccessfulMTU) / 2.0f);
+			tryMtu = (int)((_smallestFailedMtu + (float)_largestSuccessfulMtu) / 2.0f);
 			//m_peer.LogDebug("Trying MTU " + m_smallestFailedMTU + " <-> " + m_largestSuccessfulMTU + " = " + tryMTU);
 		}
 
-		if (tryMTU > c_protocolMaxMTU)
-			tryMTU = c_protocolMaxMTU;
+		if (tryMtu > ProtocolMaxMtu)
+			tryMtu = ProtocolMaxMtu;
 
-		if (tryMTU == m_largestSuccessfulMTU)
+		if (tryMtu == _largestSuccessfulMtu)
 		{
 			//m_peer.LogDebug("Found optimal MTU - exiting");
-			FinalizeMTU(m_largestSuccessfulMTU);
+			FinalizeMtu(_largestSuccessfulMtu);
 			return;
 		}
 
-		SendExpandMTU(now, tryMTU);
+		SendExpandMtu(now, tryMtu);
 	}
 
-	private void SendExpandMTU(double now, int size)
+	private void SendExpandMtu(double now, int size)
 	{
-		var om = m_peer.CreateMessage(size);
+		var om = NetPeer.CreateMessage(size);
 		var tmp = new byte[size];
 		om.Write(tmp);
-		om.m_messageType = NetMessageType.ExpandMTURequest;
-		var len = om.Encode(m_peer.m_sendBuffer, 0, 0);
+		om.MessageType = NetMessageType.ExpandMtuRequest;
+		var len = om.Encode(NetPeer.SendBuffer, 0, 0);
 
-		var ok = m_peer.SendMTUPacket(len, m_remoteEndPoint);
+		var ok = NetPeer.SendMtuPacket(len, RemoteNetEndPoint);
 		if (ok == false)
 		{
 			//m_peer.LogDebug("Send MTU failed for size " + size);
 
 			// failure
-			if (m_smallestFailedMTU == -1 || size < m_smallestFailedMTU)
+			if (_smallestFailedMtu == -1 || size < _smallestFailedMtu)
 			{
-				m_smallestFailedMTU = size;
-				m_mtuAttemptFails++;
-				if (m_mtuAttemptFails >= m_peerConfiguration.ExpandMTUFailAttempts)
+				_smallestFailedMtu = size;
+				_mtuAttemptFails++;
+				if (_mtuAttemptFails >= PeerConfiguration.ExpandMtuFailAttempts)
 				{
-					FinalizeMTU(m_largestSuccessfulMTU);
+					FinalizeMtu(_largestSuccessfulMtu);
 					return;
 				}
 			}
-			ExpandMTU(now);
+			ExpandMtu(now);
 			return;
 		}
 
-		m_lastSentMTUAttemptSize = size;
-		m_lastSentMTUAttemptTime = now;
+		_lastSentMtuAttemptSize = size;
+		_lastSentMtuAttemptTime = now;
 
-		m_statistics.PacketSent(len, 1);
-		m_peer.Recycle(om);
+		ConnectionStatistics.PacketSent(len, 1);
+		NetPeer.Recycle(om);
 	}
 
-	private void FinalizeMTU(int size)
+	private void FinalizeMtu(int size)
 	{
-		if (m_expandMTUStatus == ExpandMTUStatus.Finished)
+		if (_expandMtuStatus == ExpandMtuStatus.Finished)
 			return;
-		m_expandMTUStatus = ExpandMTUStatus.Finished;
-		m_currentMTU = size;
-		if (m_currentMTU != m_peerConfiguration.m_maximumTransmissionUnit)
-			m_peer.LogDebug("Expanded Maximum Transmission Unit to: " + m_currentMTU + " bytes");
-		return;
+		_expandMtuStatus = ExpandMtuStatus.Finished;
+		CurrentMtuValue = size;
+		if (CurrentMtuValue != PeerConfiguration.MaximumTransmissionUnit)
+			NetPeer.LogDebug("Expanded Maximum Transmission Unit to: " + CurrentMtuValue + " bytes");
 	}
 
-	private void SendMTUSuccess(int size)
+	private void SendMtuSuccess(int size)
 	{
-		var om = m_peer.CreateMessage(4);
+		var om = NetPeer.CreateMessage(4);
 		om.Write(size);
-		om.m_messageType = NetMessageType.ExpandMTUSuccess;
-		var len = om.Encode(m_peer.m_sendBuffer, 0, 0);
-		bool connectionReset;
-		m_peer.SendPacket(len, m_remoteEndPoint, 1, out connectionReset);
-		m_peer.Recycle(om);
+		om.MessageType = NetMessageType.ExpandMtuSuccess;
+		var len = om.Encode(NetPeer.SendBuffer, 0, 0);
+		NetPeer.SendPacket(len, RemoteNetEndPoint, 1, out _);
+		NetPeer.Recycle(om);
 
 		//m_peer.LogDebug("Received MTU expand request for " + size + " bytes");
 
-		m_statistics.PacketSent(len, 1);
+		ConnectionStatistics.PacketSent(len, 1);
 	}
 
-	private void HandleExpandMTUSuccess(double now, int size)
+	private void HandleExpandMtuSuccess(double now, int size)
 	{
-		if (size > m_largestSuccessfulMTU)
-			m_largestSuccessfulMTU = size;
+		if (size > _largestSuccessfulMtu)
+			_largestSuccessfulMtu = size;
 
-		if (size < m_currentMTU)
+		if (size < CurrentMtuValue)
 		{
 			//m_peer.LogDebug("Received low MTU expand success (size " + size + "); current mtu is " + m_currentMTU);
 			return;
 		}
 
 		//m_peer.LogDebug("Expanding MTU to " + size);
-		m_currentMTU = size;
+		CurrentMtuValue = size;
 
-		ExpandMTU(now);
+		ExpandMtu(now);
 	}
 }

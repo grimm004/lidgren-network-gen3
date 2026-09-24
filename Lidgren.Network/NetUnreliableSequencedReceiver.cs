@@ -2,24 +2,24 @@
 
 internal sealed class NetUnreliableSequencedReceiver(NetConnection connection) : NetReceiverChannelBase(connection)
 {
-	private int m_lastReceivedSequenceNumber = -1;
+	private int _lastReceivedSequenceNumber = -1;
 
 	internal override void ReceiveMessage(NetIncomingMessage msg)
 	{
-		var nr = msg.m_sequenceNumber;
+		var nr = msg.SequenceNumber;
 
 		// ack no matter what
-		m_connection.QueueAck(msg.m_receivedMessageType, nr);
+		Connection.QueueAck(msg.ReceivedMessageType, nr);
 
-		var relate = NetUtility.RelativeSequenceNumber(nr, m_lastReceivedSequenceNumber + 1);
+		var relate = NetUtility.RelativeSequenceNumber(nr, _lastReceivedSequenceNumber + 1);
 		if (relate < 0)
 		{
-			m_connection.m_statistics.MessageDropped();
-			m_peer.LogVerbose("Received message #" + nr + " DROPPING DUPLICATE");
+			Connection.ConnectionStatistics.MessageDropped();
+			Peer.LogVerbose("Received message #" + nr + " DROPPING DUPLICATE");
 			return; // drop if late
 		}
 
-		m_lastReceivedSequenceNumber = nr;
-		m_peer.ReleaseMessage(msg);
+		_lastReceivedSequenceNumber = nr;
+		Peer.ReleaseMessage(msg);
 	}
 }

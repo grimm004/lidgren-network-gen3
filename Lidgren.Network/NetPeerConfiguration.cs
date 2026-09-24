@@ -18,6 +18,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 namespace Lidgren.Network;
@@ -25,6 +26,7 @@ namespace Lidgren.Network;
 /// <summary>
 /// Partly immutable after NetPeer has been initialized
 /// </summary>
+[SuppressMessage("ReSharper", "BitwiseOperatorOnEnumWithoutFlags")]
 public sealed class NetPeerConfiguration
 {
 	// Maximum transmission unit
@@ -39,47 +41,24 @@ public sealed class NetPeerConfiguration
 	/// <summary>
 	/// Default MTU value in bytes
 	/// </summary>
-	public const int kDefaultMTU = 1408;
+	private const int KDefaultMtu = 1408;
 
-	private const string c_isLockedMessage = "You may not modify the NetPeerConfiguration after it has been used to initialize a NetPeer";
+	private const string IsLockedMessage = "You may not modify the NetPeerConfiguration after it has been used to initialize a NetPeer";
 
-	private bool m_isLocked;
-	private readonly string m_appIdentifier;
-	private string m_networkThreadName;
-	private IPAddress m_localAddress;
-	private IPAddress m_broadcastAddress;
-	private bool m_dualStack;
+	private bool _isLocked;
+	private readonly string _appIdentifier;
+	private string _networkThreadName;
+	private IPAddress _localAddress;
+	private IPAddress _broadcastAddress;
 
-	internal bool m_acceptIncomingConnections;
-	internal int m_maximumConnections;
-	internal int m_defaultOutgoingMessageCapacity;
-	internal float m_pingInterval;
-	internal bool m_useMessageRecycling;
-	internal int m_recycledCacheMaxCount;
-	internal float m_connectionTimeout;
-	internal bool m_enableUPnP;
-	internal bool m_autoFlushSendQueue;
-	private NetUnreliableSizeBehaviour m_unreliableSizeBehaviour;
-	internal bool m_suppressUnreliableUnorderedAcks;
+	private bool _useMessageRecycling;
+	private NetUnreliableSizeBehaviour _unreliableSizeBehaviour;
+	private bool _suppressUnreliableUnorderedAcks;
 
-	internal NetIncomingMessageType m_disabledTypes;
-	internal int m_port;
-	internal int m_receiveBufferSize;
-	internal int m_sendBufferSize;
-	internal float m_resendHandshakeInterval;
-	internal int m_maximumHandshakeAttempts;
-
-	// bad network simulation
-	internal float m_loss;
-	internal float m_duplicates;
-	internal float m_minimumOneWayLatency;
-	internal float m_randomOneWayLatency;
-
-	// MTU
-	internal int m_maximumTransmissionUnit;
-	internal bool m_autoExpandMTU;
-	internal float m_expandMTUFrequency;
-	internal int m_expandMTUFailAttempts;
+	private NetIncomingMessageType _disabledTypes;
+	private readonly int _port;
+	private int _receiveBufferSize;
+	private int _sendBufferSize;
 
 	/// <summary>
 	/// NetPeerConfiguration constructor
@@ -88,68 +67,65 @@ public sealed class NetPeerConfiguration
 	{
 		if (string.IsNullOrEmpty(appIdentifier))
 			throw new NetException("App identifier must be at least one character long");
-		m_appIdentifier = appIdentifier;
+		_appIdentifier = appIdentifier;
 
 		//
 		// default values
 		//
-		m_disabledTypes = NetIncomingMessageType.ConnectionApproval | NetIncomingMessageType.UnconnectedData | NetIncomingMessageType.VerboseDebugMessage | NetIncomingMessageType.ConnectionLatencyUpdated | NetIncomingMessageType.NatIntroductionSuccess;
-		m_networkThreadName = "Lidgren network thread";
-		m_localAddress = IPAddress.Any;
-		m_broadcastAddress = IPAddress.Broadcast;
+		_disabledTypes = NetIncomingMessageType.ConnectionApproval | NetIncomingMessageType.UnconnectedData | NetIncomingMessageType.VerboseDebugMessage | NetIncomingMessageType.ConnectionLatencyUpdated | NetIncomingMessageType.NatIntroductionSuccess;
+		_networkThreadName = "Lidgren network thread";
+		_localAddress = IPAddress.Any;
+		_broadcastAddress = IPAddress.Broadcast;
 		var ip = NetUtility.GetBroadcastAddress();
 		if (ip != null)
 		{
-			m_broadcastAddress = ip;
+			_broadcastAddress = ip;
 		}
-		m_port = 0;
-		m_receiveBufferSize = 131071;
-		m_sendBufferSize = 131071;
-		m_acceptIncomingConnections = false;
-		m_maximumConnections = 32;
-		m_defaultOutgoingMessageCapacity = 16;
-		m_pingInterval = 4.0f;
-		m_connectionTimeout = 25.0f;
-		m_useMessageRecycling = true;
-		m_recycledCacheMaxCount = 64;
-		m_resendHandshakeInterval = 3.0f;
-		m_maximumHandshakeAttempts = 5;
-		m_autoFlushSendQueue = true;
-		m_suppressUnreliableUnorderedAcks = false;
+		_port = 0;
+		_receiveBufferSize = 131071;
+		_sendBufferSize = 131071;
+		AcceptIncomingConnections = false;
+		MaximumConnections = 32;
+		DefaultOutgoingMessageCapacity = 16;
+		PingInterval = 4.0f;
+		ConnectionTimeout = 25.0f;
+		_useMessageRecycling = true;
+		RecycledCacheMaxCount = 64;
+		ResendHandshakeInterval = 3.0f;
+		MaximumHandshakeAttempts = 5;
+		AutoFlushSendQueue = true;
+		_suppressUnreliableUnorderedAcks = false;
 
-		m_maximumTransmissionUnit = kDefaultMTU;
-		m_autoExpandMTU = false;
-		m_expandMTUFrequency = 2.0f;
-		m_expandMTUFailAttempts = 5;
-		m_unreliableSizeBehaviour = NetUnreliableSizeBehaviour.IgnoreMTU;
+		MaximumTransmissionUnit = KDefaultMtu;
+		AutoExpandMtu = false;
+		ExpandMtuFrequency = 2.0f;
+		ExpandMtuFailAttempts = 5;
+		_unreliableSizeBehaviour = NetUnreliableSizeBehaviour.IgnoreMtu;
 
-		m_loss = 0.0f;
-		m_minimumOneWayLatency = 0.0f;
-		m_randomOneWayLatency = 0.0f;
-		m_duplicates = 0.0f;
+		SimulatedLoss = 0.0f;
+		SimulatedMinimumLatency = 0.0f;
+		SimulatedRandomLatency = 0.0f;
+		SimulatedDuplicatesChance = 0.0f;
 
-		m_isLocked = false;
+		_isLocked = false;
 	}
 
 	internal void Lock()
 	{
-		m_isLocked = true;
+		_isLocked = true;
 	}
 
 	/// <summary>
 	/// Gets the identifier of this application; the library can only connect to matching app identifier peers
 	/// </summary>
-	public string AppIdentifier
-	{
-		get { return m_appIdentifier; }
-	}
+	public string AppIdentifier => _appIdentifier;
 
 	/// <summary>
 	/// Enables receiving of the specified type of message
 	/// </summary>
 	public void EnableMessageType(NetIncomingMessageType type)
 	{
-		m_disabledTypes &= (~type);
+		_disabledTypes &= ~type;
 	}
 
 	/// <summary>
@@ -157,7 +133,7 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public void DisableMessageType(NetIncomingMessageType type)
 	{
-		m_disabledTypes |= type;
+		_disabledTypes |= type;
 	}
 
 	/// <summary>
@@ -166,9 +142,9 @@ public sealed class NetPeerConfiguration
 	public void SetMessageTypeEnabled(NetIncomingMessageType type, bool enabled)
 	{
 		if (enabled)
-			m_disabledTypes &= (~type);
+			_disabledTypes &= ~type;
 		else
-			m_disabledTypes |= type;
+			_disabledTypes |= type;
 	}
 
 	/// <summary>
@@ -176,7 +152,7 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public bool IsMessageTypeEnabled(NetIncomingMessageType type)
 	{
-		return !((m_disabledTypes & type) == type);
+		return !((_disabledTypes & type) == type);
 	}
 
 	/// <summary>
@@ -184,8 +160,8 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public NetUnreliableSizeBehaviour UnreliableSizeBehaviour
 	{
-		get { return m_unreliableSizeBehaviour; }
-		set { m_unreliableSizeBehaviour = value; }
+		get => _unreliableSizeBehaviour;
+		set => _unreliableSizeBehaviour = value;
 	}
 
 	/// <summary>
@@ -193,12 +169,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public string NetworkThreadName
 	{
-		get { return m_networkThreadName; }
+		get => _networkThreadName;
 		set
 		{
-			if (m_isLocked)
+			if (_isLocked)
 				throw new NetException("NetworkThreadName may not be set after the NetPeer which uses the configuration has been started");
-			m_networkThreadName = value;
+			_networkThreadName = value;
 		}
 	}
 
@@ -207,12 +183,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public int MaximumConnections
 	{
-		get { return m_maximumConnections; }
+		get;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_maximumConnections = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			field = value;
 		}
 	}
 
@@ -221,46 +197,38 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public int MaximumTransmissionUnit
 	{
-		get { return m_maximumTransmissionUnit; }
+		get;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			if (value < 1 || value >= ((ushort.MaxValue + 1) / 8))
-				throw new NetException("MaximumTransmissionUnit must be between 1 and " + (((ushort.MaxValue + 1) / 8) - 1) + " bytes");
-			m_maximumTransmissionUnit = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			if (value is < 1 or >= (ushort.MaxValue + 1) / 8)
+				throw new NetException("MaximumTransmissionUnit must be between 1 and " + ((ushort.MaxValue + 1) / 8 - 1) + " bytes");
+			field = value;
 		}
 	}
 
 	/// <summary>
 	/// Gets or sets the default capacity in bytes when NetPeer.CreateMessage() is called without argument
 	/// </summary>
-	public int DefaultOutgoingMessageCapacity
-	{
-		get { return m_defaultOutgoingMessageCapacity; }
-		set { m_defaultOutgoingMessageCapacity = value; }
-	}
+	public int DefaultOutgoingMessageCapacity { get; set; }
 
 	/// <summary>
 	/// Gets or sets the time between latency calculating pings
 	/// </summary>
-	public float PingInterval
-	{
-		get { return m_pingInterval; }
-		set { m_pingInterval = value; }
-	}
+	public float PingInterval { get; set; }
 
 	/// <summary>
 	/// Gets or sets if the library should recycling messages to avoid excessive garbage collection. Cannot be changed once NetPeer is initialized.
 	/// </summary>
 	public bool UseMessageRecycling
 	{
-		get { return m_useMessageRecycling; }
+		get => _useMessageRecycling;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_useMessageRecycling = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			_useMessageRecycling = value;
 		}
 	}
 
@@ -269,12 +237,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public int RecycledCacheMaxCount
 	{
-		get { return m_recycledCacheMaxCount; }
-		set
+		get;
+		private init
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_recycledCacheMaxCount = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			field = value;
 		}
 	}
 
@@ -283,12 +251,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public float ConnectionTimeout
 	{
-		get { return m_connectionTimeout; }
-		set
+		get;
+		private init
 		{
-			if (value < m_pingInterval)
+			if (value < PingInterval)
 				throw new NetException("Connection timeout cannot be lower than ping interval!");
-			m_connectionTimeout = value;
+			field = value;
 		}
 	}
 
@@ -297,35 +265,31 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public bool EnableUPnP
 	{
-		get { return m_enableUPnP; }
+		get;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_enableUPnP = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			field = value;
 		}
 	}
 
 	/// <summary>
 	/// Enables or disables automatic flushing of the send queue. If disabled, you must manully call NetPeer.FlushSendQueue() to flush sent messages to network.
 	/// </summary>
-	public bool AutoFlushSendQueue
-	{
-		get { return m_autoFlushSendQueue; }
-		set { m_autoFlushSendQueue = value; }
-	}
+	public bool AutoFlushSendQueue { get; set; }
 
 	/// <summary>
 	/// If true, will not send acks for unreliable unordered messages. This will save bandwidth, but disable flow control and duplicate detection for this type of messages.
 	/// </summary>
 	public bool SuppressUnreliableUnorderedAcks
 	{
-		get { return m_suppressUnreliableUnorderedAcks; }
+		get => _suppressUnreliableUnorderedAcks;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_suppressUnreliableUnorderedAcks = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			_suppressUnreliableUnorderedAcks = value;
 		}
 	}
 
@@ -334,12 +298,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public IPAddress LocalAddress
 	{
-		get { return m_localAddress; }
+		get => _localAddress;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_localAddress = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			_localAddress = value;
 		}
 	}
 
@@ -350,12 +314,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public bool DualStack
 	{
-		get { return m_dualStack;  }
+		get;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_dualStack = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			field = value;
 		}
 	}
 
@@ -364,12 +328,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public IPAddress BroadcastAddress
 	{
-		get { return m_broadcastAddress; }
+		get => _broadcastAddress;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_broadcastAddress = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			_broadcastAddress = value;
 		}
 	}
 
@@ -378,12 +342,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public int Port
 	{
-		get { return m_port; }
+		get => _port;
 		init
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_port = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			_port = value;
 		}
 	}
 
@@ -392,12 +356,12 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public int ReceiveBufferSize
 	{
-		get { return m_receiveBufferSize; }
+		get => _receiveBufferSize;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_receiveBufferSize = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			_receiveBufferSize = value;
 		}
 	}
 
@@ -406,123 +370,88 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public int SendBufferSize
 	{
-		get { return m_sendBufferSize; }
+		get => _sendBufferSize;
 		set
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_sendBufferSize = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			_sendBufferSize = value;
 		}
 	}
 
 	/// <summary>
 	/// Gets or sets if the NetPeer should accept incoming connections. This is automatically set to true in NetServer and false in NetClient.
 	/// </summary>
-	public bool AcceptIncomingConnections
-	{
-		get { return m_acceptIncomingConnections; }
-		set { m_acceptIncomingConnections = value; }
-	}
+	public bool AcceptIncomingConnections { get; set; }
 
 	/// <summary>
 	/// Gets or sets the number of seconds between handshake attempts
 	/// </summary>
-	public float ResendHandshakeInterval
-	{
-		get { return m_resendHandshakeInterval; }
-		set { m_resendHandshakeInterval = value; }
-	}
+	public float ResendHandshakeInterval { get; set; }
 
 	/// <summary>
 	/// Gets or sets the maximum number of handshake attempts before failing to connect
 	/// </summary>
 	public int MaximumHandshakeAttempts
 	{
-		get { return m_maximumHandshakeAttempts; }
+		get;
 		set
 		{
 			if (value < 1)
 				throw new NetException("MaximumHandshakeAttempts must be at least 1");
-			m_maximumHandshakeAttempts = value;
+			field = value;
 		}
 	}
 
 	/// <summary>
 	/// Gets or sets if the NetPeer should send large messages to try to expand the maximum transmission unit size
 	/// </summary>
-	public bool AutoExpandMTU
+	public bool AutoExpandMtu
 	{
-		get { return m_autoExpandMTU; }
-		set
+		get;
+		private init
 		{
-			if (m_isLocked)
-				throw new NetException(c_isLockedMessage);
-			m_autoExpandMTU = value;
+			if (_isLocked)
+				throw new NetException(IsLockedMessage);
+			field = value;
 		}
 	}
 
 	/// <summary>
 	/// Gets or sets how often to send large messages to expand MTU if AutoExpandMTU is enabled
 	/// </summary>
-	public float ExpandMTUFrequency
-	{
-		get { return m_expandMTUFrequency; }
-		set { m_expandMTUFrequency = value; }
-	}
+	public float ExpandMtuFrequency { get; set; }
 
 	/// <summary>
 	/// Gets or sets the number of failed expand mtu attempts to perform before setting final MTU
 	/// </summary>
-	public int ExpandMTUFailAttempts
-	{
-		get { return m_expandMTUFailAttempts; }
-		set { m_expandMTUFailAttempts = value; }
-	}
+	public int ExpandMtuFailAttempts { get; set; }
 
 #if DEBUG
 	/// <summary>
 	/// Gets or sets the simulated amount of sent packets lost from 0.0f to 1.0f
 	/// </summary>
-	public float SimulatedLoss
-	{
-		get { return m_loss; }
-		set { m_loss = value; }
-	}
+	public float SimulatedLoss { get; set; }
 
 	/// <summary>
 	/// Gets or sets the minimum simulated amount of one way latency for sent packets in seconds
 	/// </summary>
-	public float SimulatedMinimumLatency
-	{
-		get { return m_minimumOneWayLatency; }
-		set { m_minimumOneWayLatency = value; }
-	}
+	public float SimulatedMinimumLatency { get; set; }
 
 	/// <summary>
 	/// Gets or sets the simulated added random amount of one way latency for sent packets in seconds
 	/// </summary>
-	public float SimulatedRandomLatency
-	{
-		get { return m_randomOneWayLatency; }
-		set { m_randomOneWayLatency = value; }
-	}
+	public float SimulatedRandomLatency { get; set; }
 
 	/// <summary>
 	/// Gets the average simulated one way latency in seconds
 	/// </summary>
-	public float SimulatedAverageLatency
-	{
-		get { return m_minimumOneWayLatency + (m_randomOneWayLatency * 0.5f); }
-	}
+	public float SimulatedAverageLatency => SimulatedMinimumLatency + SimulatedRandomLatency * 0.5f;
 
 	/// <summary>
 	/// Gets or sets the simulated amount of duplicated packets from 0.0f to 1.0f
 	/// </summary>
-	public float SimulatedDuplicatesChance
-	{
-		get { return m_duplicates; }
-		set { m_duplicates = value; }
-	}
+	public float SimulatedDuplicatesChance { get; set; }
 #endif
 
 	/// <summary>
@@ -530,8 +459,8 @@ public sealed class NetPeerConfiguration
 	/// </summary>
 	public NetPeerConfiguration Clone()
 	{
-		var retval = this.MemberwiseClone() as NetPeerConfiguration;
-		retval.m_isLocked = false;
+		var retval = MemberwiseClone() as NetPeerConfiguration;
+		retval!._isLocked = false;
 		return retval;
 	}
 }
@@ -544,7 +473,7 @@ public enum NetUnreliableSizeBehaviour
 	/// <summary>
 	/// Sending an unreliable message will ignore MTU and send everything in a single packet; this is the new default
 	/// </summary>
-	IgnoreMTU = 0,
+	IgnoreMtu = 0,
 
 	/// <summary>
 	/// Old behaviour; use normal fragmentation for unreliable messages - if a fragment is dropped, memory for received fragments are never reclaimed!
@@ -554,5 +483,5 @@ public enum NetUnreliableSizeBehaviour
 	/// <summary>
 	/// Alternate behaviour; just drops unreliable messages above MTU
 	/// </summary>
-	DropAboveMTU = 2,
+	DropAboveMtu = 2,
 }

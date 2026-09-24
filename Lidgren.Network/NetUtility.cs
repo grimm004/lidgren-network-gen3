@@ -36,8 +36,6 @@ namespace Lidgren.Network;
 /// </summary>
 public static partial class NetUtility
 {
-	private static readonly bool IsMono = Type.GetType("Mono.Runtime") != null;
-
 	/// <summary>
 	/// Resolve endpoint callback
 	/// </summary>
@@ -75,12 +73,12 @@ public static partial class NetUtility
 		return adr == null ? null : new NetEndPoint(adr, port);
 	}
 
-	private static IPAddress s_broadcastAddress;
-	public static IPAddress GetCachedBroadcastAddress()
+	private static NetAddress _broadcastAddress;
+	public static NetAddress GetCachedBroadcastAddress()
 	{
-		if (s_broadcastAddress == null)
-			s_broadcastAddress = GetBroadcastAddress();
-		return s_broadcastAddress;
+		if (_broadcastAddress == null)
+			_broadcastAddress = GetBroadcastAddress();
+		return _broadcastAddress;
 	}
 
 	/// <summary>
@@ -89,14 +87,13 @@ public static partial class NetUtility
 	public static void ResolveAsync(string ipOrHost, ResolveAddressCallback callback)
 	{
 		if (string.IsNullOrEmpty(ipOrHost))
-			throw new ArgumentException("Supplied string must not be empty", "ipOrHost");
+			throw new ArgumentException("Supplied string must not be empty", nameof(ipOrHost));
 
 		ipOrHost = ipOrHost.Trim();
 
-		NetAddress ipAddress = null;
-		if (NetAddress.TryParse(ipOrHost, out ipAddress))
+		if (NetAddress.TryParse(ipOrHost, out var ipAddress))
 		{
-			if (ipAddress.AddressFamily == AddressFamily.InterNetwork || ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
+			if (ipAddress.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6)
 			{
 				callback(ipAddress);
 				return;
@@ -122,10 +119,8 @@ public static partial class NetUtility
 						callback(null);
 						return;
 					}
-					else
-					{
-						throw;
-					}
+
+					throw;
 				}
 
 				if (entry == null)
@@ -137,7 +132,7 @@ public static partial class NetUtility
 				// check each entry for a valid IP address
 				foreach (var ipCurrent in entry.AddressList)
 				{
-					if (ipCurrent.AddressFamily == AddressFamily.InterNetwork || ipCurrent.AddressFamily == AddressFamily.InterNetworkV6)
+					if (ipCurrent.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6)
 					{
 						callback(ipCurrent);
 						return;
@@ -167,14 +162,13 @@ public static partial class NetUtility
 	public static NetAddress Resolve(string ipOrHost)
 	{
 		if (string.IsNullOrEmpty(ipOrHost))
-			throw new ArgumentException("Supplied string must not be empty", "ipOrHost");
+			throw new ArgumentException("Supplied string must not be empty", nameof(ipOrHost));
 
 		ipOrHost = ipOrHost.Trim();
 
-		NetAddress ipAddress = null;
-		if (NetAddress.TryParse(ipOrHost, out ipAddress))
+		if (NetAddress.TryParse(ipOrHost, out var ipAddress))
 		{
-			if (ipAddress.AddressFamily == AddressFamily.InterNetwork || ipAddress.AddressFamily == AddressFamily.InterNetworkV6)
+			if (ipAddress.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6)
 				return ipAddress;
 			throw new ArgumentException("This method will not currently resolve other than IPv4 or IPv6 addresses");
 		}
@@ -183,11 +177,9 @@ public static partial class NetUtility
 		try
 		{
 			var addresses = Dns.GetHostAddresses(ipOrHost);
-			if (addresses == null)
-				return null;
 			foreach (var address in addresses)
 			{
-				if (address.AddressFamily == AddressFamily.InterNetwork || address.AddressFamily == AddressFamily.InterNetworkV6)
+				if (address.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6)
 					return address;
 			}
 			return null;
@@ -231,9 +223,9 @@ public static partial class NetUtility
 		byte b;
 		for (var i = 0; i < length; ++i)
 		{
-			b = ((byte)(data[offset + i] >> 4));
+			b = (byte)(data[offset + i] >> 4);
 			c[i * 2] = (char)(b > 9 ? b + 0x37 : b + 0x30);
-			b = ((byte)(data[offset + i] & 0xF));
+			b = (byte)(data[offset + i] & 0xF);
 			c[i * 2 + 1] = (char)(b > 9 ? b + 0x37 : b + 0x30);
 		}
 		return new string(c);
@@ -265,7 +257,7 @@ public static partial class NetUtility
 		var localBits = BitConverter.ToUInt32(local.GetAddressBytes(), 0);
 
 		// compare network portions
-		return ((remoteBits & maskBits) == (localBits & maskBits));
+		return (remoteBits & maskBits) == (localBits & maskBits);
 	}
 
 	/// <summary>
@@ -300,7 +292,7 @@ public static partial class NetUtility
 		return (numBits + 7) / 8;
 	}
 
-	internal static UInt32 SwapByteOrder(UInt32 value)
+	internal static uint SwapByteOrder(uint value)
 	{
 		return
 			((value & 0xff000000) >> 24) |
@@ -309,7 +301,7 @@ public static partial class NetUtility
 			((value & 0x000000ff) << 24);
 	}
 
-	internal static UInt64 SwapByteOrder(UInt64 value)
+	internal static ulong SwapByteOrder(ulong value)
 	{
 		return
 			((value & 0xff00000000000000L) >> 56) |
@@ -335,7 +327,7 @@ public static partial class NetUtility
 	/// <summary>
 	/// Convert a hexadecimal string to a byte array
 	/// </summary>
-	public static byte[] ToByteArray(String hexString)
+	public static byte[] ToByteArray(string hexString)
 	{
 		var retval = new byte[hexString.Length / 2];
 		for (var i = 0; i < hexString.Length; i += 2)
@@ -351,13 +343,13 @@ public static partial class NetUtility
 		if (bytes < 4000) // 1-4 kb is printed in bytes
 			return bytes + " bytes";
 		if (bytes < 1000 * 1000) // 4-999 kb is printed in kb
-			return Math.Round(((double)bytes / 1000.0), 2) + " kilobytes";
-		return Math.Round(((double)bytes / (1000.0 * 1000.0)), 2) + " megabytes"; // else megabytes
+			return Math.Round(bytes / 1000.0, 2) + " kilobytes";
+		return Math.Round(bytes / (1000.0 * 1000.0), 2) + " megabytes"; // else megabytes
 	}
 
 	internal static int RelativeSequenceNumber(int nr, int expected)
 	{
-		return (nr - expected + NetConstants.NumSequenceNumbers + (NetConstants.NumSequenceNumbers / 2)) % NetConstants.NumSequenceNumbers - (NetConstants.NumSequenceNumbers / 2);
+		return (nr - expected + NetConstants.NumSequenceNumbers + NetConstants.NumSequenceNumbers / 2) % NetConstants.NumSequenceNumbers - NetConstants.NumSequenceNumbers / 2;
 
 		// old impl:
 		//int retval = ((nr + NetConstants.NumSequenceNumbers) - expected) % NetConstants.NumSequenceNumbers;
@@ -391,11 +383,11 @@ public static partial class NetUtility
 	}
 
 	// shell sort
-	internal static void SortMembersList(System.Reflection.MemberInfo[] list)
+	internal static void SortMembersList<T>(T[] list)
+		where T : System.Reflection.MemberInfo
 	{
 		int h;
 		int j;
-		System.Reflection.MemberInfo tmp;
 
 		h = 1;
 		while (h * 3 + 1 <= list.Length)
@@ -405,7 +397,7 @@ public static partial class NetUtility
 		{
 			for (var i = h - 1; i < list.Length; i++)
 			{
-				tmp = list[i];
+				var tmp = list[i];
 				j = i;
 				while (true)
 				{
@@ -458,10 +450,10 @@ public static partial class NetUtility
 		return bdr.ToString();
 	}
 
-	public static byte[] ComputeSHAHash(byte[] bytes)
+	public static byte[] ComputeShaHash(byte[] bytes)
 	{
 		// this is defined in the platform specific files
-		return ComputeSHAHash(bytes, 0, bytes.Length);
+		return ComputeShaHash(bytes, 0, bytes.Length);
 	}
 
 	/// <summary>

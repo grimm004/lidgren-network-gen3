@@ -24,9 +24,9 @@ public class NetServer : NetPeer
 	public void SendToAll(NetOutgoingMessage msg, NetDeliveryMethod method)
 	{
 		// Modifying m_connections will modify the list of the connections of the NetPeer. Do only reads here
-		var all = m_connections;
+		var all = NetConnections;
 		if (all.Count <= 0) {
-			if (msg.m_isSent == false)
+			if (msg.IsSent == false)
 				Recycle(msg);
 			return;
 		}
@@ -43,9 +43,9 @@ public class NetServer : NetPeer
 	public void SendToAll(NetOutgoingMessage msg, NetDeliveryMethod method, int sequenceChannel)
 	{
 		// Modifying m_connections will modify the list of the connections of the NetPeer. Do only reads here
-		var all = m_connections;
+		var all = NetConnections;
 		if (all.Count <= 0) {
-			if (msg.m_isSent == false)
+			if (msg.IsSent == false)
 				Recycle(msg);
 			return;
 		}
@@ -63,9 +63,9 @@ public class NetServer : NetPeer
 	public void SendToAll(NetOutgoingMessage msg, NetConnection except, NetDeliveryMethod method, int sequenceChannel)
 	{
 		// Modifying m_connections will modify the list of the connections of the NetPeer. Do only reads here
-		var all = m_connections;
+		var all = NetConnections;
 		if (all.Count <= 0) {
-			if (msg.m_isSent == false)
+			if (msg.IsSent == false)
 				Recycle(msg);
 			return;
 		}

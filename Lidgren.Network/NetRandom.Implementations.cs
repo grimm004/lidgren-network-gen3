@@ -6,19 +6,19 @@ namespace Lidgren.Network;
 /// <summary>
 /// Multiply With Carry random
 /// </summary>
-public class MWCRandom : NetRandom
+public class MwcRandom : NetRandom
 {
 	/// <summary>
 	/// Get global instance of MWCRandom
 	/// </summary>
-	public static new readonly MWCRandom Instance = new();
+	public new static readonly MwcRandom Instance = new();
 
-	private uint m_w, m_z;
+	private uint _w, _z;
 
 	/// <summary>
 	/// Constructor with randomized seed
 	/// </summary>
-	public MWCRandom()
+	public MwcRandom()
 	{
 		Initialize(NetRandomSeed.GetUInt64());
 	}
@@ -29,8 +29,8 @@ public class MWCRandom : NetRandom
 	[CLSCompliant(false)]
 	public override void Initialize(uint seed)
 	{
-		m_w = seed;
-		m_z = seed * 16777619;
+		_w = seed;
+		_z = seed * 16777619;
 	}
 
 	/// <summary>
@@ -39,8 +39,8 @@ public class MWCRandom : NetRandom
 	[CLSCompliant(false)]
 	public void Initialize(ulong seed)
 	{
-		m_w = (uint)seed;
-		m_z = (uint)(seed >> 32);
+		_w = (uint)seed;
+		_z = (uint)(seed >> 32);
 	}
 
 	/// <summary>
@@ -49,9 +49,9 @@ public class MWCRandom : NetRandom
 	[CLSCompliant(false)]
 	public override uint NextUInt32()
 	{
-		m_z = 36969 * (m_z & 65535) + (m_z >> 16);
-		m_w = 18000 * (m_w & 65535) + (m_w >> 16);
-		return ((m_z << 16) + m_w);
+		_z = 36969 * (_z & 65535) + (_z >> 16);
+		_w = 18000 * (_w & 65535) + (_w >> 16);
+		return (_z << 16) + _w;
 	}
 }
 
@@ -63,14 +63,13 @@ public sealed class XorShiftRandom : NetRandom
 	/// <summary>
 	/// Get global instance of XorShiftRandom
 	/// </summary>
-	public static new readonly XorShiftRandom Instance = new();
+	public new static readonly XorShiftRandom Instance = new();
 
-	private const uint c_x = 123456789;
-	private const uint c_y = 362436069;
-	private const uint c_z = 521288629;
-	private const uint c_w = 88675123;
+	private const uint Y = 362436069;
+	private const uint Z = 521288629;
+	private const uint W = 88675123;
 
-	private uint m_x, m_y, m_z, m_w;
+	private uint _x, _y, _z, _w;
 
 	/// <summary>
 	/// Constructor with randomized seed
@@ -95,10 +94,10 @@ public sealed class XorShiftRandom : NetRandom
 	[CLSCompliant(false)]
 	public override void Initialize(uint seed)
 	{
-		m_x = (uint)seed;
-		m_y = c_y;
-		m_z = c_z;
-		m_w = c_w;
+		_x = seed;
+		_y = Y;
+		_z = Z;
+		_w = W;
 	}
 
 	/// <summary>
@@ -107,10 +106,10 @@ public sealed class XorShiftRandom : NetRandom
 	[CLSCompliant(false)]
 	public void Initialize(ulong seed)
 	{
-		m_x = (uint)seed;
-		m_y = c_y;
-		m_z = (uint)(seed << 32);
-		m_w = c_w;
+		_x = (uint)seed;
+		_y = Y;
+		_z = (uint)(seed << 32);
+		_w = W;
 	}
 
 	/// <summary>
@@ -119,9 +118,9 @@ public sealed class XorShiftRandom : NetRandom
 	[CLSCompliant(false)]
 	public override uint NextUInt32()
 	{
-		var t = (m_x ^ (m_x << 11));
-		m_x = m_y; m_y = m_z; m_z = m_w;
-		return (m_w = (m_w ^ (m_w >> 19)) ^ (t ^ (t >> 8)));
+		var t = _x ^ (_x << 11);
+		_x = _y; _y = _z; _z = _w;
+		return _w = _w ^ (_w >> 19) ^ t ^ (t >> 8);
 	}
 }
 
@@ -133,25 +132,23 @@ public sealed class MersenneTwisterRandom : NetRandom
 	/// <summary>
 	/// Get global instance of MersenneTwisterRandom
 	/// </summary>
-	public static new readonly MersenneTwisterRandom Instance = new();
+	public new static readonly MersenneTwisterRandom Instance = new();
 
 	private const int N = 624;
 	private const int M = 397;
-	private const uint MATRIX_A = 0x9908b0dfU;
-	private const uint UPPER_MASK = 0x80000000U;
-	private const uint LOWER_MASK = 0x7fffffffU;
-	private const uint TEMPER1 = 0x9d2c5680U;
-	private const uint TEMPER2 = 0xefc60000U;
-	private const int TEMPER3 = 11;
-	private const int TEMPER4 = 7;
-	private const int TEMPER5 = 15;
-	private const int TEMPER6 = 18;
+	private const uint MatrixA = 0x9908b0dfU;
+	private const uint UpperMask = 0x80000000U;
+	private const uint LowerMask = 0x7fffffffU;
+	private const uint Temper1 = 0x9d2c5680U;
+	private const uint Temper2 = 0xefc60000U;
+	private const int Temper3 = 11;
+	private const int Temper4 = 7;
+	private const int Temper5 = 15;
+	private const int Temper6 = 18;
 
-	private UInt32[] mt;
-	private int mti;
-	private UInt32[] mag01;
-
-	private const double c_realUnitInt = 1.0 / ((double)int.MaxValue + 1.0);
+	private uint[] _mt;
+	private int _mti;
+	private uint[] _mag01;
 
 	/// <summary>
 	/// Constructor with randomized seed
@@ -176,12 +173,12 @@ public sealed class MersenneTwisterRandom : NetRandom
 	[CLSCompliant(false)]
 	public override void Initialize(uint seed)
 	{
-		mt = new UInt32[N];
-		mti = N + 1;
-		mag01 = [0x0U, MATRIX_A];
-		mt[0] = seed;
+		_mt = new uint[N];
+		_mti = N + 1;
+		_mag01 = [0x0U, MatrixA];
+		_mt[0] = seed;
 		for (var i = 1; i < N; i++)
-			mt[i] = (UInt32)(1812433253 * (mt[i - 1] ^ (mt[i - 1] >> 30)) + i);
+			_mt[i] = (uint)(1812433253 * (_mt[i - 1] ^ (_mt[i - 1] >> 30)) + i);
 	}
 
 	/// <summary>
@@ -190,40 +187,40 @@ public sealed class MersenneTwisterRandom : NetRandom
 	[CLSCompliant(false)]
 	public override uint NextUInt32()
 	{
-		UInt32 y;
-		if (mti >= N)
+		uint y;
+		if (_mti >= N)
 		{
 			GenRandAll();
-			mti = 0;
+			_mti = 0;
 		}
-		y = mt[mti++];
-		y ^= (y >> TEMPER3);
-		y ^= (y << TEMPER4) & TEMPER1;
-		y ^= (y << TEMPER5) & TEMPER2;
-		y ^= (y >> TEMPER6);
+		y = _mt[_mti++];
+		y ^= y >> Temper3;
+		y ^= (y << Temper4) & Temper1;
+		y ^= (y << Temper5) & Temper2;
+		y ^= y >> Temper6;
 		return y;
 	}
 
 	private void GenRandAll()
 	{
 		var kk = 1;
-		UInt32 y;
-		UInt32 p;
-		y = mt[0] & UPPER_MASK;
+		uint y;
+		uint p;
+		y = _mt[0] & UpperMask;
 		do
 		{
-			p = mt[kk];
-			mt[kk - 1] = mt[kk + (M - 1)] ^ ((y | (p & LOWER_MASK)) >> 1) ^ mag01[p & 1];
-			y = p & UPPER_MASK;
+			p = _mt[kk];
+			_mt[kk - 1] = _mt[kk + (M - 1)] ^ ((y | (p & LowerMask)) >> 1) ^ _mag01[p & 1];
+			y = p & UpperMask;
 		} while (++kk < N - M + 1);
 		do
 		{
-			p = mt[kk];
-			mt[kk - 1] = mt[kk + (M - N - 1)] ^ ((y | (p & LOWER_MASK)) >> 1) ^ mag01[p & 1];
-			y = p & UPPER_MASK;
+			p = _mt[kk];
+			_mt[kk - 1] = _mt[kk + (M - N - 1)] ^ ((y | (p & LowerMask)) >> 1) ^ _mag01[p & 1];
+			y = p & UpperMask;
 		} while (++kk < N);
-		p = mt[0];
-		mt[N - 1] = mt[M - 1] ^ ((y | (p & LOWER_MASK)) >> 1) ^ mag01[p & 1];
+		p = _mt[0];
+		_mt[N - 1] = _mt[M - 1] ^ ((y | (p & LowerMask)) >> 1) ^ _mag01[p & 1];
 	}
 }
 
@@ -235,9 +232,9 @@ public class CryptoRandom : NetRandom
 	/// <summary>
 	/// Global instance of CryptoRandom
 	/// </summary>
-	public static new readonly CryptoRandom Instance = new();
+	public new static readonly CryptoRandom Instance = new();
 
-	private RandomNumberGenerator m_rnd = RandomNumberGenerator.Create();
+	private readonly RandomNumberGenerator _rnd = RandomNumberGenerator.Create();
 
 	/// <summary>
 	/// Seed in CryptoRandom does not create deterministic sequences
@@ -246,7 +243,7 @@ public class CryptoRandom : NetRandom
 	public override void Initialize(uint seed)
 	{
 		var tmp = new byte[seed % 16];
-		m_rnd.GetBytes(tmp); // just prime it
+		_rnd.GetBytes(tmp); // just prime it
 	}
 
 	/// <summary>
@@ -256,8 +253,8 @@ public class CryptoRandom : NetRandom
 	public override uint NextUInt32()
 	{
 		var bytes = new byte[4];
-		m_rnd.GetBytes(bytes);
-		return (uint)bytes[0] | (((uint)bytes[1]) << 8) | (((uint)bytes[2]) << 16) | (((uint)bytes[3]) << 24);
+		_rnd.GetBytes(bytes);
+		return bytes[0] | ((uint)bytes[1] << 8) | ((uint)bytes[2] << 16) | ((uint)bytes[3] << 24);
 	}
 
 	/// <summary>
@@ -265,7 +262,7 @@ public class CryptoRandom : NetRandom
 	/// </summary>
 	public override void NextBytes(byte[] buffer)
 	{
-		m_rnd.GetBytes(buffer);
+		_rnd.GetBytes(buffer);
 	}
 
 	/// <summary>
@@ -274,7 +271,7 @@ public class CryptoRandom : NetRandom
 	public override void NextBytes(byte[] buffer, int offset, int length)
 	{
 		var bytes = new byte[length];
-		m_rnd.GetBytes(bytes);
+		_rnd.GetBytes(bytes);
 		Array.Copy(bytes, 0, buffer, offset, length);
 	}
 }

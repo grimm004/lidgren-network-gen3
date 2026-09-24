@@ -18,6 +18,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 using System.Diagnostics;
+using Lidgren.Network.Encryption;
 
 #if !__NOIPENDPOINT__
 using NetEndPoint = System.Net.IPEndPoint;
@@ -31,61 +32,54 @@ namespace Lidgren.Network;
 [DebuggerDisplay("Type={MessageType} LengthBits={LengthBits}")]
 public sealed class NetIncomingMessage : NetBuffer
 {
-	internal NetIncomingMessageType m_incomingMessageType;
-	internal NetEndPoint m_senderEndPoint;
-	internal NetConnection m_senderConnection;
-	internal int m_sequenceNumber;
-	internal NetMessageType m_receivedMessageType;
-	internal bool m_isFragment;
-	internal double m_receiveTime;
+	internal NetIncomingMessageType IncomingMessageType;
+	internal int SequenceNumber;
+	internal NetMessageType ReceivedMessageType;
+	internal bool IsFragment;
 
 	/// <summary>
 	/// Gets the type of this incoming message
 	/// </summary>
-	public NetIncomingMessageType MessageType { get { return m_incomingMessageType; } }
+	public NetIncomingMessageType MessageType => IncomingMessageType;
 
 	/// <summary>
 	/// Gets the delivery method this message was sent with (if user data)
 	/// </summary>
-	public NetDeliveryMethod DeliveryMethod { get { return NetUtility.GetDeliveryMethod(m_receivedMessageType); } }
+	public NetDeliveryMethod DeliveryMethod => NetUtility.GetDeliveryMethod(ReceivedMessageType);
 
 	/// <summary>
 	/// Gets the sequence channel this message was sent with (if user data)
 	/// </summary>
-	public int SequenceChannel { get { return (int)m_receivedMessageType - (int)NetUtility.GetDeliveryMethod(m_receivedMessageType); } }
+	public int SequenceChannel => (int)ReceivedMessageType - (int)NetUtility.GetDeliveryMethod(ReceivedMessageType);
 
 	/// <summary>
 	/// endpoint of sender, if any
 	/// </summary>
-	public NetEndPoint SenderEndPoint { get { return m_senderEndPoint; } }
+	public NetEndPoint SenderEndPoint { get; internal set; }
 
 	/// <summary>
 	/// NetConnection of sender, if any
 	/// </summary>
-	public NetConnection SenderConnection { get { return m_senderConnection; } }
+	public NetConnection SenderConnection { get; internal set; }
 
 	/// <summary>
 	/// What local time the message was received from the network
 	/// </summary>
-	public double ReceiveTime { get { return m_receiveTime; } }
-
-	internal NetIncomingMessage()
-	{
-	}
+	public double ReceiveTime { get; internal set; }
 
 	internal NetIncomingMessage(NetIncomingMessageType tp)
 	{
-		m_incomingMessageType = tp;
+		IncomingMessageType = tp;
 	}
 
 	internal void Reset()
 	{
-		m_incomingMessageType = NetIncomingMessageType.Error;
-		m_readPosition = 0;
-		m_receivedMessageType = NetMessageType.LibraryError;
-		m_senderConnection = null;
-		m_bitLength = 0;
-		m_isFragment = false;
+		IncomingMessageType = NetIncomingMessageType.Error;
+		ReadPosition = 0;
+		ReceivedMessageType = NetMessageType.LibraryError;
+		SenderConnection = null;
+		BitLength = 0;
+		IsFragment = false;
 	}
 
 	/// <summary>
@@ -104,7 +98,7 @@ public sealed class NetIncomingMessage : NetBuffer
 	/// </summary>
 	public double ReadTime(bool highPrecision)
 	{
-		return ReadTime(m_senderConnection, highPrecision);
+		return ReadTime(SenderConnection, highPrecision);
 	}
 
 	/// <summary>
@@ -112,6 +106,6 @@ public sealed class NetIncomingMessage : NetBuffer
 	/// </summary>
 	public override string ToString()
 	{
-		return "[NetIncomingMessage #" + m_sequenceNumber + " " + this.LengthBytes + " bytes]";
+		return "[NetIncomingMessage #" + SequenceNumber + " " + LengthBytes + " bytes]";
 	}
 }

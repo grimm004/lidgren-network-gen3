@@ -15,10 +15,10 @@ public partial class NetPeer
 	public void DiscoverLocalPeers(int serverPort)
 	{
 		var um = CreateMessage(0);
-		um.m_messageType = NetMessageType.Discovery;
-		Interlocked.Increment(ref um.m_recyclingCount);
+		um.MessageType = NetMessageType.Discovery;
+		Interlocked.Increment(ref um.RecyclingCount);
 
-		m_unsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(new NetEndPoint(NetUtility.GetBroadcastAddress(), serverPort), um));
+		UnsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(new NetEndPoint(NetUtility.GetBroadcastAddress(), serverPort), um));
 	}
 
 	/// <summary>
@@ -39,9 +39,9 @@ public partial class NetPeer
 	public void DiscoverKnownPeer(NetEndPoint endPoint)
 	{
 		var om = CreateMessage(0);
-		om.m_messageType = NetMessageType.Discovery;
-		om.m_recyclingCount = 1;
-		m_unsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(endPoint, om));
+		om.MessageType = NetMessageType.Discovery;
+		om.RecyclingCount = 1;
+		UnsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(endPoint, om));
 	}
 
 	/// <summary>
@@ -49,19 +49,18 @@ public partial class NetPeer
 	/// </summary>
 	public void SendDiscoveryResponse(NetOutgoingMessage msg, NetEndPoint recipient)
 	{
-		if (recipient == null)
-			throw new ArgumentNullException("recipient");
+        ArgumentNullException.ThrowIfNull(recipient);
 
-		if (msg == null)
+        if (msg == null)
 			msg = CreateMessage(0);
-		else if (msg.m_isSent)
+		else if (msg.IsSent)
 			throw new NetException("Message has already been sent!");
 
-		if (msg.LengthBytes >= m_configuration.MaximumTransmissionUnit)
-			throw new NetException("Cannot send discovery message larger than MTU (currently " + m_configuration.MaximumTransmissionUnit + " bytes)");
+		if (msg.LengthBytes >= PeerConfiguration.MaximumTransmissionUnit)
+			throw new NetException("Cannot send discovery message larger than MTU (currently " + PeerConfiguration.MaximumTransmissionUnit + " bytes)");
 
-		msg.m_messageType = NetMessageType.DiscoveryResponse;
-		Interlocked.Increment(ref msg.m_recyclingCount);
-		m_unsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(recipient, msg));
+		msg.MessageType = NetMessageType.DiscoveryResponse;
+		Interlocked.Increment(ref msg.RecyclingCount);
+		UnsentUnconnectedMessages.Enqueue(new NetTuple<NetEndPoint, NetOutgoingMessage>(recipient, msg));
 	}
 }

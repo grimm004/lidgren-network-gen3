@@ -2,13 +2,13 @@
 
 internal sealed class NetUnreliableUnorderedReceiver(NetConnection connection) : NetReceiverChannelBase(connection)
 {
-	private bool m_doFlowControl = connection.Peer.Configuration.SuppressUnreliableUnorderedAcks == false;
+	private readonly bool _doFlowControl = !connection.Peer.Configuration.SuppressUnreliableUnorderedAcks;
 
 	internal override void ReceiveMessage(NetIncomingMessage msg)
 	{
-		if (m_doFlowControl)
-			m_connection.QueueAck(msg.m_receivedMessageType, msg.m_sequenceNumber);
+		if (_doFlowControl)
+			Connection.QueueAck(msg.ReceivedMessageType, msg.SequenceNumber);
 
-		m_peer.ReleaseMessage(msg);
+		Peer.ReleaseMessage(msg);
 	}
 }

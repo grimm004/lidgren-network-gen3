@@ -10,15 +10,16 @@ public abstract class NetRandom : Random
 	/// <summary>
 	/// Get global instance of NetRandom (uses MWCRandom)
 	/// </summary>
-	public static NetRandom Instance = new MWCRandom();
+	public static readonly NetRandom Instance = new MwcRandom();
 
-	private const double c_realUnitInt = 1.0 / ((double)int.MaxValue + 1.0);
+	private const double RealUnitInt = 1.0 / (int.MaxValue + 1.0);
 
 	/// <summary>
 	/// Constructor with randomized seed
 	/// </summary>
 	public NetRandom()
 	{
+		// ReSharper disable once VirtualMemberCallInConstructor
 		Initialize(NetRandomSeed.GetUInt32());
 	}
 
@@ -27,6 +28,7 @@ public abstract class NetRandom : Random
 	/// </summary>
 	public NetRandom(int seed)
 	{
+		// ReSharper disable once VirtualMemberCallInConstructor
 		Initialize((uint)seed);
 	}
 
@@ -74,7 +76,7 @@ public abstract class NetRandom : Random
 	/// </summary>
 	public override double NextDouble()
 	{
-		return c_realUnitInt * NextInt32();
+		return RealUnitInt * NextInt32();
 	}
 
 	/// <summary>
@@ -82,7 +84,7 @@ public abstract class NetRandom : Random
 	/// </summary>
 	protected override double Sample()
 	{
-		return c_realUnitInt * NextInt32();
+		return RealUnitInt * NextInt32();
 	}
 
 	/// <summary>
@@ -90,10 +92,13 @@ public abstract class NetRandom : Random
 	/// </summary>
 	public override float NextSingle()
 	{
-		var retval = (float)(c_realUnitInt * NextInt32());
-		if (retval == 1.0f)
-			return NextSingle();
-		return retval;
+		while (true)
+		{
+			var retval = (float)(RealUnitInt * NextInt32());
+			if (Math.Abs(retval - 1.0f) < 0.0000001f)
+				continue;
+			return retval;
+		}
 	}
 
 	/// <summary>
@@ -109,9 +114,9 @@ public abstract class NetRandom : Random
 	/// </summary>
 	public override int Next(int minValue, int maxValue)
 	{
-		return minValue + (int)(NextDouble() * (double)(maxValue - minValue));
+		return minValue + (int)(NextDouble() * (maxValue - minValue));
 	}
-		
+
 	/// <summary>
 	/// Generates a random value between UInt64.MinValue to UInt64.MaxValue
 	/// </summary>
@@ -119,29 +124,29 @@ public abstract class NetRandom : Random
 	public ulong NextUInt64()
 	{
 		ulong retval = NextUInt32();
-		retval |= NextUInt32() << 32;
+		retval |= (ulong)NextUInt32() << 32;
 		return retval;
 	}
 
-	private uint m_boolValues;
-	private int m_nextBoolIndex;
+	private uint _boolValues;
+	private int _nextBoolIndex;
 
 	/// <summary>
 	/// Returns true or false, randomly
 	/// </summary>
 	public bool NextBool()
 	{
-		if (m_nextBoolIndex >= 32)
+		if (_nextBoolIndex >= 32)
 		{
-			m_boolValues = NextUInt32();
-			m_nextBoolIndex = 1;
+			_boolValues = NextUInt32();
+			_nextBoolIndex = 1;
 		}
 
-		var retval = ((m_boolValues >> m_nextBoolIndex) & 1) == 1;
-		m_nextBoolIndex++;
+		var retval = ((_boolValues >> _nextBoolIndex) & 1) == 1;
+		_nextBoolIndex++;
 		return retval;
 	}
-		
+
 
 	/// <summary>
 	/// Fills all bytes from offset to offset + length in buffer with random values
@@ -159,7 +164,7 @@ public abstract class NetRandom : Random
 			buffer[ptr++] = (byte)(r >> 24);
 		}
 
-		var rest = length - (full * 4);
+		var rest = length - full * 4;
 		for (var i = 0; i < rest; i++)
 			buffer[ptr++] = (byte)NextUInt32();
 	}

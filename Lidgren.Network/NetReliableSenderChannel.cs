@@ -7,61 +7,60 @@ namespace Lidgren.Network;
 /// </summary>
 internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 {
-	private NetConnection m_connection;
-	private int m_windowStart;
-	private int m_windowSize;
-	private int m_sendStart;
+	private readonly NetConnection _connection;
+	private int _windowStart;
+	private int _sendStart;
 
-	private bool m_anyStoredResends;
+	private bool _anyStoredResends;
 
-	private NetBitVector m_receivedAcks;
-	internal NetStoredReliableMessage[] m_storedMessages;
+	private readonly NetBitVector _receivedAcks;
+	internal readonly NetStoredReliableMessage[] StoredMessages;
 
-	internal double m_resendDelay;
+	internal double ResendDelay;
 
-	internal override int WindowSize { get { return m_windowSize; } }
+	internal override int WindowSize { get; }
 
 	internal override bool NeedToSendMessages()
 	{
-		return base.NeedToSendMessages() || m_anyStoredResends;
+		return base.NeedToSendMessages() || _anyStoredResends;
 	}
 
 	internal NetReliableSenderChannel(NetConnection connection, int windowSize)
 	{
-		m_connection = connection;
-		m_windowSize = windowSize;
-		m_windowStart = 0;
-		m_sendStart = 0;
-		m_anyStoredResends = false;
-		m_receivedAcks = new NetBitVector(NetConstants.NumSequenceNumbers);
-		m_storedMessages = new NetStoredReliableMessage[m_windowSize];
-		m_queuedSends = new NetQueue<NetOutgoingMessage>(8);
-		m_resendDelay = m_connection.GetResendDelay();
+		_connection = connection;
+		WindowSize = windowSize;
+		_windowStart = 0;
+		_sendStart = 0;
+		_anyStoredResends = false;
+		_receivedAcks = new NetBitVector(NetConstants.NumSequenceNumbers);
+		StoredMessages = new NetStoredReliableMessage[WindowSize];
+		QueuedSends = new NetQueue<NetOutgoingMessage>(8);
+		ResendDelay = _connection.GetResendDelay();
 	}
 
 	internal override int GetAllowedSends()
 	{
-		var retval = m_windowSize - ((m_sendStart + NetConstants.NumSequenceNumbers) - m_windowStart) % NetConstants.NumSequenceNumbers;
-		NetException.Assert(retval >= 0 && retval <= m_windowSize);
+		var retval = WindowSize - (_sendStart + NetConstants.NumSequenceNumbers - _windowStart) % NetConstants.NumSequenceNumbers;
+		NetException.Assert(retval >= 0 && retval <= WindowSize);
 		return retval;
 	}
 
 	internal override void Reset()
 	{
-		m_receivedAcks.Clear();
-		for (var i = 0; i < m_storedMessages.Length; i++)
-			m_storedMessages[i].Reset();
-		m_anyStoredResends = false;
-		m_queuedSends.Clear();
-		m_windowStart = 0;
-		m_sendStart = 0;
+		_receivedAcks.Clear();
+		for (var i = 0; i < StoredMessages.Length; i++)
+			StoredMessages[i].Reset();
+		_anyStoredResends = false;
+		QueuedSends.Clear();
+		_windowStart = 0;
+		_sendStart = 0;
 	}
 
 	internal override NetSendResult Enqueue(NetOutgoingMessage message)
 	{
-		m_queuedSends.Enqueue(message);
-		m_connection.m_peer.m_needFlushSendQueue = true; // a race condition to this variable will simply result in a single superflous call to FlushSendQueue()
-		if (m_queuedSends.Count <= GetAllowedSends())
+		QueuedSends.Enqueue(message);
+		_connection.NetPeer.NeedFlushSendQueue = true; // a race condition to this variable will simply result in a single superflous call to FlushSendQueue()
+		if (QueuedSends.Count <= GetAllowedSends())
 			return NetSendResult.Sent;
 		return NetSendResult.Queued;
 	}
@@ -72,18 +71,18 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 		//
 		// resends
 		//
-		m_anyStoredResends = false;
-		for (var i = 0; i < m_storedMessages.Length; i++)
+		_anyStoredResends = false;
+		for (var i = 0; i < StoredMessages.Length; i++)
 		{
-			var storedMsg = m_storedMessages[i];
+			var storedMsg = StoredMessages[i];
 			var om = storedMsg.Message;
 			if (om == null)
 				continue;
 
-			m_anyStoredResends = true;
+			_anyStoredResends = true;
 
 			var t = storedMsg.LastSent;
-			if (t > 0 && (now - t) > m_resendDelay)
+			if (t > 0 && now - t > ResendDelay)
 			{
 				// deduce sequence number
 				/*
@@ -99,13 +98,13 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 				*/
 
 				//m_connection.m_peer.LogVerbose("Resending due to delay #" + m_storedMessages[i].SequenceNumber + " " + om.ToString());
-				m_connection.m_statistics.MessageResent(MessageResendReason.Delay);
+				_connection.ConnectionStatistics.MessageResent(MessageResendReason.Delay);
 
-				Interlocked.Increment(ref om.m_recyclingCount); // increment this since it's being decremented in QueueSendMessage
-				m_connection.QueueSendMessage(om, storedMsg.SequenceNumber);
+				Interlocked.Increment(ref om.RecyclingCount); // increment this since it's being decremented in QueueSendMessage
+				_connection.QueueSendMessage(om, storedMsg.SequenceNumber);
 
-				m_storedMessages[i].LastSent = now;
-				m_storedMessages[i].NumSent++;
+				StoredMessages[i].LastSent = now;
+				StoredMessages[i].NumSent++;
 			}
 		}
 
@@ -114,10 +113,10 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 			return;
 
 		// queued sends
-		while (num > 0 && m_queuedSends.Count > 0)
+		while (num > 0 && QueuedSends.Count > 0)
 		{
 			NetOutgoingMessage om;
-			if (m_queuedSends.TryDequeue(out om))
+			if (QueuedSends.TryDequeue(out om))
 				ExecuteSend(now, om);
 			num--;
 			NetException.Assert(num == GetAllowedSends());
@@ -126,52 +125,50 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 
 	private void ExecuteSend(double now, NetOutgoingMessage message)
 	{
-		var seqNr = m_sendStart;
-		m_sendStart = (m_sendStart + 1) % NetConstants.NumSequenceNumbers;
+		var seqNr = _sendStart;
+		_sendStart = (_sendStart + 1) % NetConstants.NumSequenceNumbers;
 
 		// must increment recycle count here, since it's decremented in QueueSendMessage and we want to keep it for the future in case or resends
 		// we will decrement once more in DestoreMessage for final recycling
-		Interlocked.Increment(ref message.m_recyclingCount);
+		Interlocked.Increment(ref message.RecyclingCount);
 
-		m_connection.QueueSendMessage(message, seqNr);
+		_connection.QueueSendMessage(message, seqNr);
 
-		var storeIndex = seqNr % m_windowSize;
-		NetException.Assert(m_storedMessages[storeIndex].Message == null);
+		var storeIndex = seqNr % WindowSize;
+		NetException.Assert(StoredMessages[storeIndex].Message == null);
 
-		m_storedMessages[storeIndex].NumSent++;
-		m_storedMessages[storeIndex].Message = message;
-		m_storedMessages[storeIndex].LastSent = now;
-		m_storedMessages[storeIndex].SequenceNumber = seqNr;
-		m_anyStoredResends = true;
-
-		return;
+		StoredMessages[storeIndex].NumSent++;
+		StoredMessages[storeIndex].Message = message;
+		StoredMessages[storeIndex].LastSent = now;
+		StoredMessages[storeIndex].SequenceNumber = seqNr;
+		_anyStoredResends = true;
 	}
 
 	private void DestoreMessage(double now, int storeIndex, out bool resetTimeout)
 	{
 		// reset timeout if we receive ack within kThreshold of sending it
 		const double kThreshold = 2.0;
-		var srm = m_storedMessages[storeIndex];
-		resetTimeout = (srm.NumSent == 1) && (now - srm.LastSent < kThreshold);
+		var srm = StoredMessages[storeIndex];
+		resetTimeout = srm.NumSent == 1 && now - srm.LastSent < kThreshold;
 
 		var storedMessage = srm.Message;
 
 		// on each destore; reduce recyclingcount so that when all instances are destored, the outgoing message can be recycled
-		Interlocked.Decrement(ref storedMessage.m_recyclingCount);
+		Interlocked.Decrement(ref storedMessage.RecyclingCount);
 #if DEBUG
 		if (storedMessage == null)
-			throw new NetException("m_storedMessages[" + storeIndex + "].Message is null; sent " + m_storedMessages[storeIndex].NumSent + " times, last time " + (NetTime.Now - m_storedMessages[storeIndex].LastSent) + " seconds ago");
+			throw new NetException("m_storedMessages[" + storeIndex + "].Message is null; sent " + StoredMessages[storeIndex].NumSent + " times, last time " + (NetTime.Now - StoredMessages[storeIndex].LastSent) + " seconds ago");
 #else
 			if (storedMessage != null)
 			{
 #endif
-		if (storedMessage.m_recyclingCount <= 0)
-			m_connection.m_peer.Recycle(storedMessage);
+		if (storedMessage.RecyclingCount <= 0)
+			_connection.NetPeer.Recycle(storedMessage);
 
 #if !DEBUG
 			}
 #endif
-		m_storedMessages[storeIndex] = new NetStoredReliableMessage();
+		StoredMessages[storeIndex] = new NetStoredReliableMessage();
 	}
 
 	// remoteWindowStart is remote expected sequence number; everything below this has arrived properly
@@ -179,7 +176,7 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 	internal override void ReceiveAcknowledge(double now, int seqNr)
 	{
 		// late (dupe), on time or early ack?
-		var relate = NetUtility.RelativeSequenceNumber(seqNr, m_windowStart);
+		var relate = NetUtility.RelativeSequenceNumber(seqNr, _windowStart);
 
 		if (relate < 0)
 		{
@@ -192,28 +189,28 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 			//m_connection.m_peer.LogDebug("Received right-on-time ack for #" + seqNr);
 
 			// ack arrived right on time
-			NetException.Assert(seqNr == m_windowStart);
+			NetException.Assert(seqNr == _windowStart);
 
 			bool resetTimeout;
-			m_receivedAcks[m_windowStart] = false;
-			DestoreMessage(now, m_windowStart % m_windowSize, out resetTimeout);
-			m_windowStart = (m_windowStart + 1) % NetConstants.NumSequenceNumbers;
+			_receivedAcks[_windowStart] = false;
+			DestoreMessage(now, _windowStart % WindowSize, out resetTimeout);
+			_windowStart = (_windowStart + 1) % NetConstants.NumSequenceNumbers;
 
 			// advance window if we already have early acks
-			while (m_receivedAcks.Get(m_windowStart))
+			while (_receivedAcks.Get(_windowStart))
 			{
 				//m_connection.m_peer.LogDebug("Using early ack for #" + m_windowStart + "...");
-				m_receivedAcks[m_windowStart] = false;
+				_receivedAcks[_windowStart] = false;
 				bool rt;
-				DestoreMessage(now, m_windowStart % m_windowSize, out rt);
+				DestoreMessage(now, _windowStart % WindowSize, out rt);
 				resetTimeout |= rt;
 
-				NetException.Assert(m_storedMessages[m_windowStart % m_windowSize].Message == null); // should already be destored
-				m_windowStart = (m_windowStart + 1) % NetConstants.NumSequenceNumbers;
+				NetException.Assert(StoredMessages[_windowStart % WindowSize].Message == null); // should already be destored
+				_windowStart = (_windowStart + 1) % NetConstants.NumSequenceNumbers;
 				//m_connection.m_peer.LogDebug("Advancing window to #" + m_windowStart);
 			}
 			if (resetTimeout)
-				m_connection.ResetTimeout(now);
+				_connection.ResetTimeout(now);
 			return;
 		}
 
@@ -226,20 +223,20 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 
 		//m_connection.m_peer.LogDebug("Received early ack for #" + seqNr);
 
-		var sendRelate = NetUtility.RelativeSequenceNumber(seqNr, m_sendStart);
+		var sendRelate = NetUtility.RelativeSequenceNumber(seqNr, _sendStart);
 		if (sendRelate <= 0)
 		{
 			// yes, we've sent this message - it's an early (but valid) ack
-			if (m_receivedAcks[seqNr])
+			if (_receivedAcks[seqNr])
 			{
 				// we've already destored/been acked for this message
 			}
 			else
 			{
-				m_receivedAcks[seqNr] = true;
+				_receivedAcks[seqNr] = true;
 			}
 		}
-		else if (sendRelate > 0)
+		else
 		{
 			// uh... we haven't sent this message yet? Weird, dupe or error...
 			NetException.Assert(false, "Got ack for message not yet sent?");
@@ -254,35 +251,35 @@ internal sealed class NetReliableSenderChannel : NetSenderChannelBase
 			if (rnr < 0)
 				rnr = NetConstants.NumSequenceNumbers - 1;
 
-			if (m_receivedAcks[rnr])
+			if (_receivedAcks[rnr])
 			{
 				// m_connection.m_peer.LogDebug("Not resending #" + rnr + " (since we got ack)");
 			}
 			else
 			{
-				var slot = rnr % m_windowSize;
-				NetException.Assert(m_storedMessages[slot].Message != null);
-				if (m_storedMessages[slot].NumSent == 1)
+				var slot = rnr % WindowSize;
+				NetException.Assert(StoredMessages[slot].Message != null);
+				if (StoredMessages[slot].NumSent == 1)
 				{
 					// just sent once; resend immediately since we found gap in ack sequence
-					var rmsg = m_storedMessages[slot].Message;
+					var rmsg = StoredMessages[slot].Message;
 					//m_connection.m_peer.LogVerbose("Resending #" + rnr + " (" + rmsg + ")");
 
-					if (now - m_storedMessages[slot].LastSent < (m_resendDelay * 0.35))
+					if (now - StoredMessages[slot].LastSent < ResendDelay * 0.35)
 					{
 						// already resent recently
 					}
 					else
 					{
-						m_storedMessages[slot].LastSent = now;
-						m_storedMessages[slot].NumSent++;
-						m_connection.m_statistics.MessageResent(MessageResendReason.HoleInSequence);
-						Interlocked.Increment(ref rmsg.m_recyclingCount); // increment this since it's being decremented in QueueSendMessage
-						m_connection.QueueSendMessage(rmsg, rnr);
+						StoredMessages[slot].LastSent = now;
+						StoredMessages[slot].NumSent++;
+						_connection.ConnectionStatistics.MessageResent(MessageResendReason.HoleInSequence);
+						Interlocked.Increment(ref rmsg!.RecyclingCount); // increment this since it's being decremented in QueueSendMessage
+						_connection.QueueSendMessage(rmsg, rnr);
 					}
 				}
 			}
 
-		} while (rnr != m_windowStart);
+		} while (rnr != _windowStart);
 	}
 }

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Lidgren.Network;
+namespace Lidgren.Network.Encryption;
 
 /// <summary>
 /// Base for a non-threadsafe encryption class
@@ -8,20 +8,21 @@ namespace Lidgren.Network;
 public abstract class NetBlockEncryptionBase : NetEncryption
 {
 	// temporary space for one block to avoid reallocating every time
-	private byte[] m_tmp;
+	private readonly byte[] _tmp;
 
 	/// <summary>
 	/// Block size in bytes for this cipher
 	/// </summary>
-	public abstract int BlockSize { get; }
+	private int BlockSize { get; }
 
 	/// <summary>
 	/// NetBlockEncryptionBase constructor
 	/// </summary>
-	public NetBlockEncryptionBase(NetPeer peer)
+	protected NetBlockEncryptionBase(NetPeer peer, int blockSize = 0)
 		: base(peer)
 	{
-		m_tmp = new byte[BlockSize];
+		BlockSize = blockSize;
+		_tmp = new byte[BlockSize];
 	}
 
 	/// <summary>
@@ -31,21 +32,20 @@ public abstract class NetBlockEncryptionBase : NetEncryption
 	{
 		var payloadBitLength = msg.LengthBits;
 		var numBytes = msg.LengthBytes;
-		var blockSize = BlockSize;
-		var numBlocks = (int)Math.Ceiling((double)numBytes / (double)blockSize);
-		var dstSize = numBlocks * blockSize;
+		var numBlocks = (int)Math.Ceiling((double)numBytes / BlockSize);
+		var dstSize = numBlocks * BlockSize;
 
-		msg.EnsureBufferSize(dstSize * 8 + (4 * 8)); // add 4 bytes for payload length at end
+		msg.EnsureBufferSize(dstSize * 8 + 4 * 8); // add 4 bytes for payload length at end
 		msg.LengthBits = dstSize * 8; // length will automatically adjust +4 bytes when payload length is written
 
 		for(var i=0;i<numBlocks;i++)
 		{
-			EncryptBlock(msg.m_data, (i * blockSize), m_tmp);
-			Buffer.BlockCopy(m_tmp, 0, msg.m_data, (i * blockSize), m_tmp.Length);
+			EncryptBlock(msg.DataBuffer, i * BlockSize, _tmp);
+			Buffer.BlockCopy(_tmp, 0, msg.DataBuffer, i * BlockSize, _tmp.Length);
 		}
 
 		// add true payload length last
-		msg.Write((UInt32)payloadBitLength);
+		msg.Write((uint)payloadBitLength);
 
 		return true;
 	}
@@ -58,20 +58,19 @@ public abstract class NetBlockEncryptionBase : NetEncryption
 	public override bool Decrypt(NetIncomingMessage msg)
 	{
 		var numEncryptedBytes = msg.LengthBytes - 4; // last 4 bytes is true bit length
-		var blockSize = BlockSize;
-		var numBlocks = numEncryptedBytes / blockSize;
-		if (numBlocks * blockSize != numEncryptedBytes)
+		var numBlocks = numEncryptedBytes / BlockSize;
+		if (numBlocks * BlockSize != numEncryptedBytes)
 			return false;
 
 		for (var i = 0; i < numBlocks; i++)
 		{
-			DecryptBlock(msg.m_data, (i * blockSize), m_tmp);
-			Buffer.BlockCopy(m_tmp, 0, msg.m_data, (i * blockSize), m_tmp.Length);
+			DecryptBlock(msg.DataBuffer, i * BlockSize, _tmp);
+			Buffer.BlockCopy(_tmp, 0, msg.DataBuffer, i * BlockSize, _tmp.Length);
 		}
 
 		// read 32 bits of true payload length
-		var realSize = NetBitWriter.ReadUInt32(msg.m_data, 32, (numEncryptedBytes * 8));
-		msg.m_bitLength = (int)realSize;
+		var realSize = NetBitWriter.ReadUInt32(msg.DataBuffer, 32, numEncryptedBytes * 8);
+		msg.BitLength = (int)realSize;
 		return true;
 	}
 

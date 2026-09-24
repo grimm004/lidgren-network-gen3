@@ -49,10 +49,10 @@ public sealed class NetQueue<T>
 	// [6] item
 	// [7] item
 	//
-	private T[] m_items;
-	private readonly ReaderWriterLockSlim m_lock = new();
-	private int m_size;
-	private int m_head;
+	private T[] _items;
+	private readonly ReaderWriterLockSlim _lock = new();
+	private int _size;
+	private int _head;
 
 	/// <summary>
 	/// Gets the number of items in the queue
@@ -60,9 +60,9 @@ public sealed class NetQueue<T>
 	public int Count {
 		get
 		{
-			m_lock.EnterReadLock();
-			var count = m_size;
-			m_lock.ExitReadLock();
+			_lock.EnterReadLock();
+			var count = _size;
+			_lock.ExitReadLock();
 			return count;
 		}
 	}
@@ -74,9 +74,9 @@ public sealed class NetQueue<T>
 	{
 		get
 		{
-			m_lock.EnterReadLock();
-			var capacity = m_items.Length;
-			m_lock.ExitReadLock();
+			_lock.EnterReadLock();
+			var capacity = _items.Length;
+			_lock.ExitReadLock();
 			return capacity;
 		}
 	}
@@ -86,7 +86,7 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public NetQueue(int initialCapacity)
 	{
-		m_items = new T[initialCapacity];
+		_items = new T[initialCapacity];
 	}
 
 	/// <summary>
@@ -94,19 +94,19 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public void Enqueue(T item)
 	{
-		m_lock.EnterWriteLock();
+		_lock.EnterWriteLock();
 		try
 		{
-			if (m_size == m_items.Length)
-				SetCapacity(m_items.Length + 8);
+			if (_size == _items.Length)
+				SetCapacity(_items.Length + 8);
 
-			var slot = (m_head + m_size) % m_items.Length;
-			m_items[slot] = item;
-			m_size++;
+			var slot = (_head + _size) % _items.Length;
+			_items[slot] = item;
+			_size++;
 		}
 		finally
 		{
-			m_lock.ExitWriteLock();
+			_lock.ExitWriteLock();
 		}
 	}
 
@@ -115,22 +115,22 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public void Enqueue(IEnumerable<T> items)
 	{
-		m_lock.EnterWriteLock();
+		_lock.EnterWriteLock();
 		try
 		{
 			foreach (var item in items)
 			{
-				if (m_size == m_items.Length)
-					SetCapacity(m_items.Length + 8); // @TODO move this out of loop
+				if (_size == _items.Length)
+					SetCapacity(_items.Length + 8); // @TODO move this out of loop
 
-				var slot = (m_head + m_size) % m_items.Length;
-				m_items[slot] = item;
-				m_size++;
+				var slot = (_head + _size) % _items.Length;
+				_items[slot] = item;
+				_size++;
 			}
 		}
 		finally
 		{
-			m_lock.ExitWriteLock();
+			_lock.ExitWriteLock();
 		}
 	}
 
@@ -139,51 +139,48 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public void EnqueueFirst(T item)
 	{
-		m_lock.EnterWriteLock();
+		_lock.EnterWriteLock();
 		try
 		{
-			if (m_size >= m_items.Length)
-				SetCapacity(m_items.Length + 8);
+			if (_size >= _items.Length)
+				SetCapacity(_items.Length + 8);
 
-			m_head--;
-			if (m_head < 0)
-				m_head = m_items.Length - 1;
-			m_items[m_head] = item;
-			m_size++;
+			_head--;
+			if (_head < 0)
+				_head = _items.Length - 1;
+			_items[_head] = item;
+			_size++;
 		}
 		finally
 		{
-			m_lock.ExitWriteLock();
+			_lock.ExitWriteLock();
 		}
 	}
 
 	// must be called from within a write locked m_lock!
 	private void SetCapacity(int newCapacity)
 	{
-		if (m_size == 0)
+		if (_size is 0)
 		{
-			if (m_size == 0)
-			{
-				m_items = new T[newCapacity];
-				m_head = 0;
-				return;
-			}
+			_items = new T[newCapacity];
+			_head = 0;
+			return;
 		}
 
 		var newItems = new T[newCapacity];
 
-		if (m_head + m_size - 1 < m_items.Length)
+		if (_head + _size - 1 < _items.Length)
 		{
-			Array.Copy(m_items, m_head, newItems, 0, m_size);
+			Array.Copy(_items, _head, newItems, 0, _size);
 		}
 		else
 		{
-			Array.Copy(m_items, m_head, newItems, 0, m_items.Length - m_head);
-			Array.Copy(m_items, 0, newItems, m_items.Length - m_head, (m_size - (m_items.Length - m_head)));
+			Array.Copy(_items, _head, newItems, 0, _items.Length - _head);
+			Array.Copy(_items, 0, newItems, _items.Length - _head, _size - (_items.Length - _head));
 		}
 
-		m_items = newItems;
-		m_head = 0;
+		_items = newItems;
+		_head = 0;
 
 	}
 
@@ -192,41 +189,40 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public bool TryDequeue(out T item)
 	{
-		if (m_size == 0)
+		if (_size == 0)
+		{
+			item = default;
+			return false;
+		}
+
+		_lock.EnterWriteLock();
+		try
+		{
+			if (_size == 0)
+			{
+				item = default;
+				return false;
+			}
+
+			item = _items[_head];
+			_items[_head] = default;
+
+			_head = (_head + 1) % _items.Length;
+			_size--;
+
+			return true;
+		}
+#if DEBUG
+#else
+		catch
 		{
 			item = default(T);
 			return false;
 		}
-
-		m_lock.EnterWriteLock();
-		try
-		{
-			if (m_size == 0)
-			{
-				item = default(T);
-				return false;
-			}
-
-			item = m_items[m_head];
-			m_items[m_head] = default(T);
-
-			m_head = (m_head + 1) % m_items.Length;
-			m_size--;
-
-			return true;
-		}
-		catch
-		{
-#if DEBUG
-			throw;
-#else
-				item = default(T);
-				return false;
 #endif
-		}
 		finally
 		{
-			m_lock.ExitWriteLock();
+			_lock.ExitWriteLock();
 		}
 	}
 
@@ -235,27 +231,27 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public int TryDrain(IList<T> addTo)
 	{
-		if (m_size == 0)
+		if (_size == 0)
 			return 0;
 
-		m_lock.EnterWriteLock();
+		_lock.EnterWriteLock();
 		try
 		{
-			var added = m_size;
-			while (m_size > 0)
+			var added = _size;
+			while (_size > 0)
 			{
-				var item = m_items[m_head];
+				var item = _items[_head];
 				addTo.Add(item);
 
-				m_items[m_head] = default(T);
-				m_head = (m_head + 1) % m_items.Length;
-				m_size--;
+				_items[_head] = default;
+				_head = (_head + 1) % _items.Length;
+				_size--;
 			}
 			return added;
 		}
 		finally
 		{
-			m_lock.ExitWriteLock();
+			_lock.ExitWriteLock();
 		}
 	}
 
@@ -264,19 +260,19 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public T TryPeek(int offset)
 	{
-		if (m_size == 0)
-			return default(T);
+		if (_size == 0)
+			return default;
 
-		m_lock.EnterReadLock();
+		_lock.EnterReadLock();
 		try
 		{
-			if (m_size == 0)
-				return default(T);
-			return m_items[(m_head + offset) % m_items.Length];
+			if (_size == 0)
+				return default;
+			return _items[(_head + offset) % _items.Length];
 		}
 		finally
 		{
-			m_lock.ExitReadLock();
+			_lock.ExitReadLock();
 		}
 	}
 
@@ -285,29 +281,29 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public bool Contains(T item)
 	{
-		m_lock.EnterReadLock();
+		_lock.EnterReadLock();
 		try
 		{
-			var ptr = m_head;
-			for (var i = 0; i < m_size; i++)
+			var ptr = _head;
+			for (var i = 0; i < _size; i++)
 			{
-				if (m_items[ptr] == null)
+				if (_items[ptr] == null)
 				{
 					if (item == null)
 						return true;
 				}
 				else
 				{
-					if (m_items[ptr].Equals(item))
+					if (_items[ptr].Equals(item))
 						return true;
 				}
-				ptr = (ptr + 1) % m_items.Length;
+				ptr = (ptr + 1) % _items.Length;
 			}
 			return false;
 		}
 		finally
 		{
-			m_lock.ExitReadLock();
+			_lock.ExitReadLock();
 		}
 	}
 
@@ -316,22 +312,22 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public T[] ToArray()
 	{
-		m_lock.EnterReadLock();
+		_lock.EnterReadLock();
 		try
 		{
-			var retval = new T[m_size];
-			var ptr = m_head;
-			for (var i = 0; i < m_size; i++)
+			var retval = new T[_size];
+			var ptr = _head;
+			for (var i = 0; i < _size; i++)
 			{
-				retval[i] = m_items[ptr++];
-				if (ptr >= m_items.Length)
+				retval[i] = _items[ptr++];
+				if (ptr >= _items.Length)
 					ptr = 0;
 			}
 			return retval;
 		}
 		finally
 		{
-			m_lock.ExitReadLock();
+			_lock.ExitReadLock();
 		}
 	}
 
@@ -340,17 +336,17 @@ public sealed class NetQueue<T>
 	/// </summary>
 	public void Clear()
 	{
-		m_lock.EnterWriteLock();
+		_lock.EnterWriteLock();
 		try
 		{
-			for (var i = 0; i < m_items.Length; i++)
-				m_items[i] = default(T);
-			m_head = 0;
-			m_size = 0;
+			for (var i = 0; i < _items.Length; i++)
+				_items[i] = default;
+			_head = 0;
+			_size = 0;
 		}
 		finally
 		{
-			m_lock.ExitWriteLock();
+			_lock.ExitWriteLock();
 		}
 	}
 }

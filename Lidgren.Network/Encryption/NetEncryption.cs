@@ -1,4 +1,4 @@
-﻿namespace Lidgren.Network;
+﻿namespace Lidgren.Network.Encryption;
 
 /// <summary>
 /// Interface for an encryption algorithm
@@ -8,25 +8,23 @@ public abstract class NetEncryption
 	/// <summary>
 	/// NetPeer
 	/// </summary>
-	protected NetPeer m_peer;
+	protected NetPeer Peer { get; }
 
 	/// <summary>
 	/// Constructor
 	/// </summary>
-	public NetEncryption(NetPeer peer)
+	protected NetEncryption(NetPeer peer)
 	{
-		if (peer == null)
-			throw new NetException("Peer must not be null");
-		m_peer = peer;
+		Peer = peer ?? throw new NetException("Peer must not be null");
 	}
 
-	public void SetKey(string str)
+	protected void SetKey(string str)
 	{
 		var bytes = System.Text.Encoding.ASCII.GetBytes(str);
 		SetKey(bytes, 0, bytes.Length);
 	}
 
-	public abstract void SetKey(byte[] data, int offset, int count);
+	protected abstract void SetKey(byte[] data, int offset, int count);
 
 	/// <summary>
 	/// Encrypt an outgoing message in place

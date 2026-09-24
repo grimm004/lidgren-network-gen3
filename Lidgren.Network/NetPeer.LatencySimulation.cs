@@ -34,7 +34,7 @@ public partial class NetPeer
 {
 
 #if DEBUG
-	private readonly List<DelayedPacket> m_delayedPackets = new();
+	private readonly List<DelayedPacket> _delayedPackets = [];
 
 	private class DelayedPacket
 	{
@@ -48,51 +48,52 @@ public partial class NetPeer
 		connectionReset = false;
 
 		// simulate loss
-		var loss = m_configuration.m_loss;
+		var loss = PeerConfiguration.SimulatedLoss;
 		if (loss > 0.0f)
 		{
-			if ((float)MWCRandom.Instance.NextDouble() < loss)
+			if ((float)MwcRandom.Instance.NextDouble() < loss)
 			{
 				LogVerbose("Sending packet " + numBytes + " bytes - SIMULATED LOST!");
 				return; // packet "lost"
 			}
 		}
 
-		m_statistics.PacketSent(numBytes, numMessages);
+		_statistics.PacketSent(numBytes, numMessages);
 
 		// simulate latency
-		var m = m_configuration.m_minimumOneWayLatency;
-		var r = m_configuration.m_randomOneWayLatency;
+		var m = PeerConfiguration.SimulatedMinimumLatency;
+		var r = PeerConfiguration.SimulatedRandomLatency;
 		if (m == 0.0f && r == 0.0f)
 		{
 			// no latency simulation
 			// LogVerbose("Sending packet " + numBytes + " bytes");
-			var wasSent = ActuallySendPacket(m_sendBuffer, numBytes, target, out connectionReset);
+			ActuallySendPacket(SendBuffer, numBytes, target, out connectionReset);
 			// TODO: handle wasSent == false?
 
-			if (m_configuration.m_duplicates > 0.0f && MWCRandom.Instance.NextDouble() < m_configuration.m_duplicates)
-				ActuallySendPacket(m_sendBuffer, numBytes, target, out connectionReset); // send it again!
+			if (PeerConfiguration.SimulatedDuplicatesChance > 0.0f && MwcRandom.Instance.NextDouble() < PeerConfiguration.SimulatedDuplicatesChance)
+				ActuallySendPacket(SendBuffer, numBytes, target, out connectionReset); // send it again!
 
 			return;
 		}
 
 		var num = 1;
-		if (m_configuration.m_duplicates > 0.0f && MWCRandom.Instance.NextSingle() < m_configuration.m_duplicates)
+		if (PeerConfiguration.SimulatedDuplicatesChance > 0.0f && MwcRandom.Instance.NextSingle() < PeerConfiguration.SimulatedDuplicatesChance)
 			num++;
 
-		float delay = 0;
 		for (var i = 0; i < num; i++)
 		{
-			delay = m_configuration.m_minimumOneWayLatency + (MWCRandom.Instance.NextSingle() * m_configuration.m_randomOneWayLatency);
+			var delay = PeerConfiguration.SimulatedMinimumLatency + MwcRandom.Instance.NextSingle() * PeerConfiguration.SimulatedRandomLatency;
 
 			// Enqueue delayed packet
-			var p = new DelayedPacket();
-			p.Target = target;
-			p.Data = new byte[numBytes];
-			Buffer.BlockCopy(m_sendBuffer, 0, p.Data, 0, numBytes);
+			var p = new DelayedPacket
+			{
+				Target = target,
+				Data = new byte[numBytes]
+			};
+			Buffer.BlockCopy(SendBuffer, 0, p.Data, 0, numBytes);
 			p.DelayedUntil = NetTime.Now + delay;
 
-			m_delayedPackets.Add(p);
+			_delayedPackets.Add(p);
 		}
 
 		// LogVerbose("Sending packet " + numBytes + " bytes - delayed " + NetTime.ToReadable(delay));
@@ -100,20 +101,18 @@ public partial class NetPeer
 
 	private void SendDelayedPackets()
 	{
-		if (m_delayedPackets.Count <= 0)
+		if (_delayedPackets.Count <= 0)
 			return;
 
 		var now = NetTime.Now;
 
-		bool connectionReset;
-
 		RestartDelaySending:
-		foreach (var p in m_delayedPackets)
+		foreach (var p in _delayedPackets)
 		{
 			if (now > p.DelayedUntil)
 			{
-				ActuallySendPacket(p.Data, p.Data.Length, p.Target, out connectionReset);
-				m_delayedPackets.Remove(p);
+				ActuallySendPacket(p.Data, p.Data.Length, p.Target, out _);
+				_delayedPackets.Remove(p);
 				goto RestartDelaySending;
 			}
 		}
@@ -123,16 +122,18 @@ public partial class NetPeer
 	{
 		try
 		{
-			bool connectionReset;
-			foreach (var p in m_delayedPackets)
-				ActuallySendPacket(p.Data, p.Data.Length, p.Target, out connectionReset);
-			m_delayedPackets.Clear();
+			foreach (var p in _delayedPackets)
+				ActuallySendPacket(p.Data, p.Data.Length, p.Target, out _);
+			_delayedPackets.Clear();
 		}
-		catch { }
+		catch
+		{
+			// ignored
+		}
 	}
 
 	//Avoids allocation on mapping to IPv6
-	private IPEndPoint targetCopy = new(IPAddress.Any, 0);
+	private readonly NetEndPoint _targetCopy = new(IPAddress.Any, 0);
 
 	internal bool ActuallySendPacket(byte[] data, int numBytes, NetEndPoint target, out bool connectionReset)
 	{
@@ -145,22 +146,22 @@ public partial class NetPeer
 			// TODO: refactor this check outta here
 			if (target.Address.Equals(ba))
 			{
-				// Some networks do not allow 
+				// Some networks do not allow
 				// a global broadcast so we use the BroadcastAddress from the configuration
-				// this can be resolved to a local broadcast addresss e.g 192.168.x.255                    
-				targetCopy.Address = m_configuration.BroadcastAddress;
-				targetCopy.Port = target.Port;
-				m_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+				// this can be resolved to a local broadcast addresss e.g 192.168.x.255
+				_targetCopy.Address = PeerConfiguration.BroadcastAddress;
+				_targetCopy.Port = target.Port;
+				Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
 			}
-			else if(m_configuration.DualStack && m_configuration.LocalAddress.AddressFamily == AddressFamily.InterNetworkV6)
-				NetUtility.CopyEndpoint(target, targetCopy); //Maps to IPv6 for Dual Mode
+			else if(PeerConfiguration.DualStack && PeerConfiguration.LocalAddress.AddressFamily == AddressFamily.InterNetworkV6)
+				NetUtility.CopyEndpoint(target, _targetCopy); //Maps to IPv6 for Dual Mode
 			else
 			{
-				targetCopy.Port = target.Port;
-				targetCopy.Address = target.Address;
+				_targetCopy.Port = target.Port;
+				_targetCopy.Address = target.Address;
 			}
 
-			var bytesSent = m_socket.SendTo(data, 0, numBytes, SocketFlags.None, targetCopy);
+			var bytesSent = Socket.SendTo(data, 0, numBytes, SocketFlags.None, _targetCopy);
 			if (numBytes != bytesSent)
 				LogWarning("Failed to send the full " + numBytes + "; only " + bytesSent + " bytes sent in packet!");
 
@@ -176,7 +177,7 @@ public partial class NetPeer
 			}
 			if (sx.SocketErrorCode == SocketError.ConnectionReset)
 			{
-				// connection reset by peer, aka connection forcibly closed aka "ICMP port unreachable" 
+				// connection reset by peer, aka connection forcibly closed aka "ICMP port unreachable"
 				connectionReset = true;
 				return false;
 			}
@@ -189,21 +190,21 @@ public partial class NetPeer
 		finally
 		{
 			if (target.Address.Equals(ba))
-				m_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, false);
+				Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, false);
 		}
 		return true;
 	}
 
-	internal bool SendMTUPacket(int numBytes, NetEndPoint target)
+	internal bool SendMtuPacket(int numBytes, NetEndPoint target)
 	{
 		try
 		{
-			m_socket.DontFragment = true;
-			var bytesSent = m_socket.SendTo(m_sendBuffer, 0, numBytes, SocketFlags.None, target);
+			Socket.DontFragment = true;
+			var bytesSent = Socket.SendTo(SendBuffer, 0, numBytes, SocketFlags.None, target);
 			if (numBytes != bytesSent)
 				LogWarning("Failed to send the full " + numBytes + "; only " + bytesSent + " bytes sent in packet!");
 
-			m_statistics.PacketSent(numBytes, 1);
+			_statistics.PacketSent(numBytes, 1);
 		}
 		catch (SocketException sx)
 		{
@@ -225,7 +226,7 @@ public partial class NetPeer
 		}
 		finally
 		{
-			m_socket.DontFragment = false;
+			Socket.DontFragment = false;
 		}
 		return true;
 	}
@@ -295,7 +296,7 @@ public partial class NetPeer
 				}
 				if (sx.SocketErrorCode == SocketError.ConnectionReset)
 				{
-					// connection reset by peer, aka connection forcibly closed aka "ICMP port unreachable" 
+					// connection reset by peer, aka connection forcibly closed aka "ICMP port unreachable"
 					connectionReset = true;
 					return;
 				}

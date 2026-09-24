@@ -10,32 +10,28 @@ namespace Lidgren.Network;
 
 public static partial class NetUtility
 {
-	private static readonly long s_timeInitialized = Stopwatch.GetTimestamp();
-	private static readonly double s_dInvFreq = 1.0 / (double)Stopwatch.Frequency;
-		
+	private static readonly long TimeInitialized = Stopwatch.GetTimestamp();
+	private static readonly double DInvFreq = 1.0 / Stopwatch.Frequency;
+
 	[CLSCompliant(false)]
 	public static ulong GetPlatformSeed(int seedInc)
 	{
-		var seed = (ulong)System.Diagnostics.Stopwatch.GetTimestamp();
+		var seed = (ulong)Stopwatch.GetTimestamp();
 		return seed ^ ((ulong)Environment.WorkingSet + (ulong)seedInc);
 	}
 
-	public static double Now { get { return (double)(Stopwatch.GetTimestamp() - s_timeInitialized) * s_dInvFreq; } }
+	public static double Now => (Stopwatch.GetTimestamp() - TimeInitialized) * DInvFreq;
 
 	private static NetworkInterface GetNetworkInterface()
 	{
-		var computerProperties = IPGlobalProperties.GetIPGlobalProperties();
-		if (computerProperties == null)
-			return null;
-
 		var nics = NetworkInterface.GetAllNetworkInterfaces();
-		if (nics == null || nics.Length < 1)
+		if (nics.Length < 1)
 			return null;
 
 		NetworkInterface best = null;
 		foreach (var adapter in nics)
 		{
-			if (adapter.NetworkInterfaceType == NetworkInterfaceType.Loopback || adapter.NetworkInterfaceType == NetworkInterfaceType.Unknown)
+			if (adapter.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Unknown)
 				continue;
 			if (!adapter.Supports(NetworkInterfaceComponent.IPv4))
 				continue;
@@ -48,7 +44,7 @@ public static partial class NetUtility
 			var properties = adapter.GetIPProperties();
 			foreach (var unicastAddress in properties.UnicastAddresses)
 			{
-				if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
+				if (unicastAddress is { Address.AddressFamily: AddressFamily.InterNetwork })
 				{
 					// Yes it does, return this network interface.
 					return adapter;
@@ -78,7 +74,7 @@ public static partial class NetUtility
 		var properties = ni.GetIPProperties();
 		foreach (var unicastAddress in properties.UnicastAddresses)
 		{
-			if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
+			if (unicastAddress is { Address.AddressFamily: AddressFamily.InterNetwork })
 			{
 				var mask = unicastAddress.IPv4Mask;
 				var ipAdressBytes = unicastAddress.Address.GetAddressBytes();
@@ -113,7 +109,7 @@ public static partial class NetUtility
 		var properties = ni.GetIPProperties();
 		foreach (var unicastAddress in properties.UnicastAddresses)
 		{
-			if (unicastAddress != null && unicastAddress.Address != null && unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork)
+			if (unicastAddress is { Address.AddressFamily: AddressFamily.InterNetwork })
 			{
 				mask = unicastAddress.IPv4Mask;
 				return unicastAddress.Address;
@@ -133,22 +129,22 @@ public static partial class NetUtility
 	{
 		return new IPAddress(bytes);
 	}
-		
-	private static readonly SHA256 s_sha = SHA256.Create();
-	public static byte[] ComputeSHAHash(byte[] bytes, int offset, int count)
+
+	private static readonly SHA256 Sha = SHA256.Create();
+	public static byte[] ComputeShaHash(byte[] bytes, int offset, int count)
 	{
-		return s_sha.ComputeHash(bytes, offset, count);
+		return Sha.ComputeHash(bytes, offset, count);
 	}
 }
 
 public static partial class NetTime
 {
-	private static readonly long s_timeInitialized = Stopwatch.GetTimestamp();
-	private static readonly double s_dInvFreq = 1.0 / (double)Stopwatch.Frequency;
-		
+	private static readonly long TimeInitialized = Stopwatch.GetTimestamp();
+	private static readonly double DInvFreq = 1.0 / Stopwatch.Frequency;
+
 	/// <summary>
 	/// Get number of seconds since the application started
 	/// </summary>
-	public static double Now { get { return (double)(Stopwatch.GetTimestamp() - s_timeInitialized) * s_dInvFreq; } }
+	public static double Now => (Stopwatch.GetTimestamp() - TimeInitialized) * DInvFreq;
 }
 #endif

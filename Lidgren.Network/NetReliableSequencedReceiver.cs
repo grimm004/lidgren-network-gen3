@@ -3,21 +3,21 @@
 internal sealed class NetReliableSequencedReceiver(NetConnection connection, int windowSize)
 	: NetReceiverChannelBase(connection)
 {
-	private int m_windowStart;
+	private int _windowStart;
 
 	private void AdvanceWindow()
 	{
-		m_windowStart = (m_windowStart + 1) % NetConstants.NumSequenceNumbers;
+		_windowStart = (_windowStart + 1) % NetConstants.NumSequenceNumbers;
 	}
 
 	internal override void ReceiveMessage(NetIncomingMessage message)
 	{
-		var nr = message.m_sequenceNumber;
+		var nr = message.SequenceNumber;
 
-		var relate = NetUtility.RelativeSequenceNumber(nr, m_windowStart);
+		var relate = NetUtility.RelativeSequenceNumber(nr, _windowStart);
 
 		// ack no matter what
-		m_connection.QueueAck(message.m_receivedMessageType, nr);
+		Connection.QueueAck(message.ReceivedMessageType, nr);
 
 		if (relate == 0)
 		{
@@ -28,14 +28,14 @@ internal sealed class NetReliableSequencedReceiver(NetConnection connection, int
 			//
 
 			AdvanceWindow();
-			m_peer.ReleaseMessage(message);
+			Peer.ReleaseMessage(message);
 			return;
 		}
 
 		if (relate < 0)
 		{
-			m_connection.m_statistics.MessageDropped();
-			m_peer.LogVerbose("Received message #" + message.m_sequenceNumber + " DROPPING LATE or DUPE");
+			Connection.ConnectionStatistics.MessageDropped();
+			Peer.LogVerbose("Received message #" + message.SequenceNumber + " DROPPING LATE or DUPE");
 			return;
 		}
 
@@ -43,14 +43,13 @@ internal sealed class NetReliableSequencedReceiver(NetConnection connection, int
 		if (relate > windowSize)
 		{
 			// too early message!
-			m_connection.m_statistics.MessageDropped();
-			m_peer.LogDebug("Received " + message + " TOO EARLY! Expected " + m_windowStart);
+			Connection.ConnectionStatistics.MessageDropped();
+			Peer.LogDebug("Received " + message + " TOO EARLY! Expected " + _windowStart);
 			return;
 		}
 
 		// ok
-		m_windowStart = (m_windowStart + relate) % NetConstants.NumSequenceNumbers;
-		m_peer.ReleaseMessage(message);
-		return;
+		_windowStart = (_windowStart + relate) % NetConstants.NumSequenceNumbers;
+		Peer.ReleaseMessage(message);
 	}
 }

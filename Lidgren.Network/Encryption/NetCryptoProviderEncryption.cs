@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Security.Cryptography;
 
-namespace Lidgren.Network;
+namespace Lidgren.Network.Encryption;
 
 public abstract class NetCryptoProviderEncryption(NetPeer peer) : NetEncryption(peer)
 {
@@ -15,7 +15,7 @@ public abstract class NetCryptoProviderEncryption(NetPeer peer) : NetEncryption(
 
 		var ms = new MemoryStream();
 		var cs = GetEncryptStream(ms);
-		cs.Write(msg.m_data, 0, msg.LengthBytes);
+		cs.Write(msg.DataBuffer, 0, msg.LengthBytes);
 		cs.Close();
 
 		// get results
@@ -35,17 +35,17 @@ public abstract class NetCryptoProviderEncryption(NetPeer peer) : NetEncryption(
 	{
 		var unEncLenBits = (int)msg.ReadUInt32();
 
-		var ms = new MemoryStream(msg.m_data, 4, msg.LengthBytes - 4);
+		var ms = new MemoryStream(msg.DataBuffer, 4, msg.LengthBytes - 4);
 		var cs = GetDecryptStream(ms);
 
-		var result = m_peer.GetStorage(unEncLenBits);
+		var result = Peer.GetStorage(unEncLenBits);
 		cs.ReadExactly(result, 0, NetUtility.BytesToHoldBits(unEncLenBits));
 		cs.Close();
 
 		// TODO: recycle existing msg
 
-		msg.m_data = result;
-		msg.m_bitLength = unEncLenBits;
+		msg.DataBuffer = result;
+		msg.BitLength = unEncLenBits;
 
 		return true;
 	}

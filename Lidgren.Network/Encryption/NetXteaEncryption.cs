@@ -20,38 +20,53 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 using System;
 using System.Text;
 
-namespace Lidgren.Network;
+namespace Lidgren.Network.Encryption;
 
 /// <summary>
 /// Methods to encrypt and decrypt data using the XTEA algorithm
 /// </summary>
 public sealed class NetXtea : NetBlockEncryptionBase
 {
-	private const int c_blockSize = 8;
-	private const int c_keySize = 16;
-	private const int c_delta = unchecked((int)0x9E3779B9);
+	private const int BlockSize = 8;
+	private const int KeySize = 16;
 
-	private readonly int m_numRounds;
-	private readonly uint[] m_sum0;
-	private readonly uint[] m_sum1;
-
-	/// <summary>
-	/// Gets the block size for this cipher
-	/// </summary>
-	public override int BlockSize { get { return c_blockSize; } }
+	private readonly int _numRounds;
+	private readonly uint[] _sum0;
+	private readonly uint[] _sum1;
 
 	/// <summary>
 	/// 16 byte key
 	/// </summary>
-	public NetXtea(NetPeer peer, byte[] key, int rounds)
-		: base(peer)
+	public NetXtea(NetPeer peer, byte[] key, int rounds = 32)
+		: base(peer, BlockSize)
 	{
-		if (key.Length < c_keySize)
+		if (key.Length < KeySize)
 			throw new NetException("Key too short!");
 
-		m_numRounds = rounds;
-		m_sum0 = new uint[m_numRounds];
-		m_sum1 = new uint[m_numRounds];
+		_numRounds = rounds;
+		_sum0 = new uint[_numRounds];
+		_sum1 = new uint[_numRounds];
+
+		SetKey(key);
+	}
+
+	/// <summary>
+	/// String to hash for key
+	/// </summary>
+	public NetXtea(NetPeer peer, string key)
+		: this(peer, NetUtility.ComputeShaHash(Encoding.UTF8.GetBytes(key)))
+	{
+	}
+
+	protected override void SetKey(byte[] data, int offset, int length)
+	{
+		var key = NetUtility.ComputeShaHash(data, offset, length);
+		NetException.Assert(key.Length >= 16);
+		SetKey(key);
+	}
+
+	private void SetKey(byte[] key)
+	{
 		var tmp = new uint[8];
 
 		int num2;
@@ -64,33 +79,10 @@ public sealed class NetXtea : NetBlockEncryptionBase
 		}
 		for (index = num2 = 0; index < 32; index++)
 		{
-			m_sum0[index] = ((uint)num2) + tmp[num2 & 3];
+			_sum0[index] = (uint)num2 + tmp[num2 & 3];
 			num2 += -1640531527;
-			m_sum1[index] = ((uint)num2) + tmp[(num2 >> 11) & 3];
+			_sum1[index] = (uint)num2 + tmp[(num2 >> 11) & 3];
 		}
-	}
-
-	/// <summary>
-	/// 16 byte key
-	/// </summary>
-	public NetXtea(NetPeer peer, byte[] key)
-		: this(peer, key, 32)
-	{
-	}
-
-	/// <summary>
-	/// String to hash for key
-	/// </summary>
-	public NetXtea(NetPeer peer, string key)
-		: this(peer, NetUtility.ComputeSHAHash(Encoding.UTF8.GetBytes(key)), 32)
-	{
-	}
-
-	public override void SetKey(byte[] data, int offset, int length)
-	{
-		var key = NetUtility.ComputeSHAHash(data, offset, length);
-		NetException.Assert(key.Length >= 16);
-		SetKey(key, 0, 16);
 	}
 
 	/// <summary>
@@ -101,16 +93,14 @@ public sealed class NetXtea : NetBlockEncryptionBase
 		var v0 = BytesToUInt(source, sourceOffset);
 		var v1 = BytesToUInt(source, sourceOffset + 4);
 
-		for (var i = 0; i != m_numRounds; i++)
+		for (var i = 0; i != _numRounds; i++)
 		{
-			v0 += (((v1 << 4) ^ (v1 >> 5)) + v1) ^ m_sum0[i];
-			v1 += (((v0 << 4) ^ (v0 >> 5)) + v0) ^ m_sum1[i];
+			v0 += (((v1 << 4) ^ (v1 >> 5)) + v1) ^ _sum0[i];
+			v1 += (((v0 << 4) ^ (v0 >> 5)) + v0) ^ _sum1[i];
 		}
 
 		UIntToBytes(v0, destination, 0);
 		UIntToBytes(v1, destination, 0 + 4);
-
-		return;
 	}
 
 	/// <summary>
@@ -122,16 +112,14 @@ public sealed class NetXtea : NetBlockEncryptionBase
 		var v0 = BytesToUInt(source, sourceOffset);
 		var v1 = BytesToUInt(source, sourceOffset + 4);
 
-		for (var i = m_numRounds - 1; i >= 0; i--)
+		for (var i = _numRounds - 1; i >= 0; i--)
 		{
-			v1 -= (((v0 << 4) ^ (v0 >> 5)) + v0) ^ m_sum1[i];
-			v0 -= (((v1 << 4) ^ (v1 >> 5)) + v1) ^ m_sum0[i];
+			v1 -= (((v0 << 4) ^ (v0 >> 5)) + v0) ^ _sum1[i];
+			v0 -= (((v1 << 4) ^ (v1 >> 5)) + v1) ^ _sum0[i];
 		}
 
 		UIntToBytes(v0, destination, 0);
 		UIntToBytes(v1, destination, 0 + 4);
-
-		return;
 	}
 
 	private static uint BytesToUInt(byte[] bytes, int offset)
@@ -139,7 +127,7 @@ public sealed class NetXtea : NetBlockEncryptionBase
 		var retval = (uint)(bytes[offset] << 24);
 		retval |= (uint)(bytes[++offset] << 16);
 		retval |= (uint)(bytes[++offset] << 8);
-		return (retval | bytes[++offset]);
+		return retval | bytes[++offset];
 	}
 
 	private static void UIntToBytes(uint value, byte[] destination, int destinationOffset)
@@ -147,6 +135,6 @@ public sealed class NetXtea : NetBlockEncryptionBase
 		destination[destinationOffset++] = (byte)(value >> 24);
 		destination[destinationOffset++] = (byte)(value >> 16);
 		destination[destinationOffset++] = (byte)(value >> 8);
-		destination[destinationOffset++] = (byte)value;
+		destination[destinationOffset] = (byte)value;
 	}
 }

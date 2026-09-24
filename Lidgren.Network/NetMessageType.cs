@@ -170,6 +170,6 @@ internal enum NetMessageType : byte
 	NatIntroduction = 139, // send to master server
 	NatIntroductionConfirmRequest = 142,
 	NatIntroductionConfirmed = 143,
-	ExpandMTURequest = 140,
-	ExpandMTUSuccess = 141,
+	ExpandMtuRequest = 140,
+	ExpandMtuSuccess = 141,
 }

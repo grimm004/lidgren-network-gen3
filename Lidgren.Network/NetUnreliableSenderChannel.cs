@@ -5,59 +5,58 @@
 /// </summary>
 internal sealed class NetUnreliableSenderChannel : NetSenderChannelBase
 {
-	private NetConnection m_connection;
-	private int m_windowStart;
-	private int m_windowSize;
-	private int m_sendStart;
-	private bool m_doFlowControl;
+	private readonly NetConnection _connection;
+	private int _windowStart;
+	private int _sendStart;
+	private readonly bool _doFlowControl;
 
-	private NetBitVector m_receivedAcks;
+	private readonly NetBitVector _receivedAcks;
 
-	internal override int WindowSize { get { return m_windowSize; } }
+	internal override int WindowSize { get; }
 
 	internal NetUnreliableSenderChannel(NetConnection connection, int windowSize, NetDeliveryMethod method)
 	{
-		m_connection = connection;
-		m_windowSize = windowSize;
-		m_windowStart = 0;
-		m_sendStart = 0;
-		m_receivedAcks = new NetBitVector(NetConstants.NumSequenceNumbers);
-		m_queuedSends = new NetQueue<NetOutgoingMessage>(8);
+		_connection = connection;
+		WindowSize = windowSize;
+		_windowStart = 0;
+		_sendStart = 0;
+		_receivedAcks = new NetBitVector(NetConstants.NumSequenceNumbers);
+		QueuedSends = new NetQueue<NetOutgoingMessage>(8);
 
-		m_doFlowControl = true;
-		if (method == NetDeliveryMethod.Unreliable && connection.Peer.Configuration.SuppressUnreliableUnorderedAcks == true)
-			m_doFlowControl = false;
+		_doFlowControl = true;
+		if (method == NetDeliveryMethod.Unreliable && connection.Peer.Configuration.SuppressUnreliableUnorderedAcks)
+			_doFlowControl = false;
 	}
 
 	internal override int GetAllowedSends()
 	{
-		if (!m_doFlowControl)
+		if (!_doFlowControl)
 			return int.MaxValue; // always allowed to send without flow control!
-		var retval = m_windowSize - ((m_sendStart + NetConstants.NumSequenceNumbers) - m_windowStart) % m_windowSize;
-		NetException.Assert(retval >= 0 && retval <= m_windowSize);
+		var retval = WindowSize - (_sendStart + NetConstants.NumSequenceNumbers - _windowStart) % WindowSize;
+		NetException.Assert(retval >= 0 && retval <= WindowSize);
 		return retval;
 	}
 
 	internal override void Reset()
 	{
-		m_receivedAcks.Clear();
-		m_queuedSends.Clear();
-		m_windowStart = 0;
-		m_sendStart = 0;
+		_receivedAcks.Clear();
+		QueuedSends.Clear();
+		_windowStart = 0;
+		_sendStart = 0;
 	}
 
 	internal override NetSendResult Enqueue(NetOutgoingMessage message)
 	{
-		var queueLen = m_queuedSends.Count + 1;
+		var queueLen = QueuedSends.Count + 1;
 		var left = GetAllowedSends();
-		if (queueLen > left || (message.LengthBytes > m_connection.m_currentMTU && m_connection.m_peerConfiguration.UnreliableSizeBehaviour == NetUnreliableSizeBehaviour.DropAboveMTU))
+		if (queueLen > left || (message.LengthBytes > _connection.CurrentMtuValue && _connection.PeerConfiguration.UnreliableSizeBehaviour == NetUnreliableSizeBehaviour.DropAboveMtu))
 		{
 			// drop message
 			return NetSendResult.Dropped;
 		}
 
-		m_queuedSends.Enqueue(message);
-		m_connection.m_peer.m_needFlushSendQueue = true; // a race condition to this variable will simply result in a single superflous call to FlushSendQueue()
+		QueuedSends.Enqueue(message);
+		_connection.NetPeer.NeedFlushSendQueue = true; // a race condition to this variable will simply result in a single superflous call to FlushSendQueue()
 		return NetSendResult.Sent;
 	}
 
@@ -69,10 +68,10 @@ internal sealed class NetUnreliableSenderChannel : NetSenderChannelBase
 			return;
 
 		// queued sends
-		while (num > 0 && m_queuedSends.Count > 0)
+		while (num > 0 && QueuedSends.Count > 0)
 		{
 			NetOutgoingMessage om;
-			if (m_queuedSends.TryDequeue(out om))
+			if (QueuedSends.TryDequeue(out om))
 				ExecuteSend(om);
 			num--;
 		}
@@ -80,32 +79,30 @@ internal sealed class NetUnreliableSenderChannel : NetSenderChannelBase
 
 	private void ExecuteSend(NetOutgoingMessage message)
 	{
-		m_connection.m_peer.VerifyNetworkThread();
+		_connection.NetPeer.VerifyNetworkThread();
 
-		var seqNr = m_sendStart;
-		m_sendStart = (m_sendStart + 1) % NetConstants.NumSequenceNumbers;
+		var seqNr = _sendStart;
+		_sendStart = (_sendStart + 1) % NetConstants.NumSequenceNumbers;
 
-		m_connection.QueueSendMessage(message, seqNr);
+		_connection.QueueSendMessage(message, seqNr);
 
-		if (message.m_recyclingCount <= 0)
-			m_connection.m_peer.Recycle(message);
-
-		return;
+		if (message.RecyclingCount <= 0)
+			_connection.NetPeer.Recycle(message);
 	}
-		
+
 	// remoteWindowStart is remote expected sequence number; everything below this has arrived properly
 	// seqNr is the actual nr received
 	internal override void ReceiveAcknowledge(double now, int seqNr)
 	{
-		if (m_doFlowControl == false)
+		if (_doFlowControl == false)
 		{
 			// we have no use for acks on this channel since we don't respect the window anyway
-			m_connection.m_peer.LogWarning("SuppressUnreliableUnorderedAcks sender/receiver mismatch!");
+			_connection.NetPeer.LogWarning("SuppressUnreliableUnorderedAcks sender/receiver mismatch!");
 			return;
 		}
 
 		// late (dupe), on time or early ack?
-		var relate = NetUtility.RelativeSequenceNumber(seqNr, m_windowStart);
+		var relate = NetUtility.RelativeSequenceNumber(seqNr, _windowStart);
 
 		if (relate < 0)
 		{
@@ -118,21 +115,21 @@ internal sealed class NetUnreliableSenderChannel : NetSenderChannelBase
 			//m_connection.m_peer.LogDebug("Received right-on-time ack for #" + seqNr);
 
 			// ack arrived right on time
-			NetException.Assert(seqNr == m_windowStart);
+			NetException.Assert(seqNr == _windowStart);
 
-			m_receivedAcks[m_windowStart] = false;
-			m_windowStart = (m_windowStart + 1) % NetConstants.NumSequenceNumbers;
+			_receivedAcks[_windowStart] = false;
+			_windowStart = (_windowStart + 1) % NetConstants.NumSequenceNumbers;
 
 			return;
 		}
 
 		// Advance window to this position
-		m_receivedAcks[seqNr] = true;
+		_receivedAcks[seqNr] = true;
 
-		while (m_windowStart != seqNr)
+		while (_windowStart != seqNr)
 		{
-			m_receivedAcks[m_windowStart] = false;
-			m_windowStart = (m_windowStart + 1) % NetConstants.NumSequenceNumbers;
+			_receivedAcks[_windowStart] = false;
+			_windowStart = (_windowStart + 1) % NetConstants.NumSequenceNumbers;
 		}
 	}
 }
