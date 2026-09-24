@@ -61,7 +61,7 @@ public abstract class NetCryptoProviderBase : NetEncryption
 
 		var byteLen = NetUtility.BytesToHoldBits(unEncLenBits);
 		var result = m_peer.GetStorage(byteLen);
-		cs.Read(result, 0, byteLen);
+		cs.ReadExactly(result, 0, byteLen);
 		cs.Close();
 
 		// TODO: recycle existing msg
